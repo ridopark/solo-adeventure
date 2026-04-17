@@ -27,7 +27,7 @@ func Load() Config {
 		LogLevel:        getenv("LOG_LEVEL", "info"),
 		CORSAllowOrigin: getenv("CORS_ALLOW_ORIGIN", "http://localhost:3004"),
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
-		AnthropicModel:  getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+		AnthropicModel:  getenv("ANTHROPIC_MODEL", "claude-haiku-4-5"),
 		TogetherAPIKey:  os.Getenv("TOGETHER_API_KEY"),
 		FalKey:          os.Getenv("FAL_KEY"),
 		StoryProvider:   getenv("STORY_PROVIDER", "anthropic"),

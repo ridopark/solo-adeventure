@@ -117,7 +117,7 @@ jobs:
             LOG_LEVEL=info
             STORY_PROVIDER=anthropic
             ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-            ANTHROPIC_MODEL=claude-sonnet-4-6
+            ANTHROPIC_MODEL=claude-haiku-4-5
             IMAGE_PRIMARY=together
             IMAGE_FALLBACK=
             TOGETHER_API_KEY=${TOGETHER_API_KEY}
