@@ -119,7 +119,7 @@ jobs:
             ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
             ANTHROPIC_MODEL=claude-haiku-4-5
             IMAGE_PRIMARY=together
-            IMAGE_FALLBACK=
+            IMAGE_FALLBACK=fal
             TOGETHER_API_KEY=${TOGETHER_API_KEY}
             FAL_KEY=${FAL_KEY}
             CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN}
