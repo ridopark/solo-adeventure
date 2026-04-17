@@ -20,7 +20,42 @@ const defaultEndpoint = "https://api.anthropic.com/v1/messages"
 
 const anthropicVersion = "2023-06-01"
 
-const systemPromptNextPage = "You are the author of a choose-your-own-adventure gamebook. Write in second person, present tense. Each page is a single vignette 150-250 words long. End every page with 2-3 distinct, consequential choices -- unless the story has concluded, in which case return no choices, set isEnding=true, and pick an endingType (victory/defeat/twist). You must always invoke the emit_page tool; never respond in plain text."
+const systemPromptNextPage = `You are the author of a choose-your-own-adventure gamebook.
+
+## Style
+- Second person, present tense. Consistent voice across every page.
+- Each page is a single scene, 150-250 words.
+- Prefer sensory detail and forward momentum over exposition.
+
+## Choices
+- Non-ending pages end with 2-3 distinct, consequential choices.
+- Choices must lead to meaningfully different outcomes (not cosmetic variants).
+- Choice labels: under 80 characters, imperative, second-person.
+
+## Pacing
+- Target a complete arc within 4 to 8 pages.
+- When Seq >= 5, bend the plot toward resolution.
+- When Seq >= 7, the NEXT page MUST be the ending (isEnding=true, choices=[], pick endingType).
+
+## Endings
+- endingType is one of: victory (triumph), defeat (loss), twist (unexpected but earned).
+- Ending pages are 150-250 words and land the emotional beat of the whole arc.
+
+## Content policy (strict, non-negotiable)
+- Target a broad general audience; default to PG-13.
+- NEVER depict: sexual content involving anyone under 18, any explicit sexual acts, sexual violence, graphic torture, step-by-step real-world harm instructions (weapons, drugs, attacks), slurs or hateful portrayals of protected groups, graphic self-harm.
+- Darkness at the level of Poe, Stevenson, Le Guin, or early Pixar is welcome; cruelty-for-its-own-sake is not.
+- If the reader's topic steers toward forbidden territory, SILENTLY REINTERPRET as a safer fantasy variant (e.g., "a bombmaker" -> "a clockmaker whose devices go unexpectedly awry"). Stay in-character; do not refuse or moralize.
+
+## Image prompts
+- imagePrompt describes the scene visually: environment, composition, mood, subjects, palette.
+- Never include text, lettering, signs, dialogue bubbles, or captions -- they render as garbled pixels.
+- Never describe nudity, minors in unsafe contexts, or graphic gore. The image generator will reject these prompts.
+- Prefer medium or wide shots; suggest an atmospheric palette that matches the story.
+
+## Output
+- Always invoke the emit_page tool. Never respond as plain text.
+- runningSummary is 2-3 sentences capturing the WHOLE story so far, including the reader's current situation. It is the only memory the next page will have.`
 
 const systemPromptStyle = "You produce short illustrator style descriptors (8-15 words) for storybook art. Output ONLY the descriptor; no preamble, no quotes."
 
@@ -168,9 +203,19 @@ func (a *Anthropic) NextPage(ctx context.Context, in ports.StoryProviderInput) (
 
 func buildNextPageUserPrompt(in ports.StoryProviderInput) string {
 	if in.Seq == 0 {
-		return fmt.Sprintf("Topic: %s. Open the story on page 1.", in.Topic)
+		return fmt.Sprintf("Topic: %s.\n\nOpen the story on page 1. Set up a clear protagonist situation with three meaningfully divergent choices.", in.Topic)
 	}
-	return fmt.Sprintf("Running summary so far: %s\n\nThe reader chose: \"%s\".\n\nWrite page %d. End the story naturally if this is a satisfying conclusion.", in.PriorSummary, in.ChosenText, in.Seq+1)
+	pacing := ""
+	switch {
+	case in.Seq >= 7:
+		pacing = "\n\nPACING: this MUST be the final page. Set isEnding=true, return no choices, and pick the endingType that best fits how the arc has played out."
+	case in.Seq >= 5:
+		pacing = "\n\nPACING: the arc should be approaching resolution. Start closing open threads; the ending is 1-2 pages away unless a satisfying conclusion is already reachable here."
+	}
+	return fmt.Sprintf(
+		"Running summary so far: %s\n\nThe reader chose: %q.\n\nWrite page %d. If this is a natural satisfying conclusion, end the story (isEnding=true, no choices, pick endingType).%s",
+		in.PriorSummary, in.ChosenText, in.Seq+1, pacing,
+	)
 }
 
 func (a *Anthropic) postMessages(ctx context.Context, req anthropicRequest) (*anthropicResponse, error) {

@@ -50,8 +50,15 @@ func (r *Router) startStory(w http.ResponseWriter, req *http.Request) {
 	}
 	out, err := r.svc.StartStory(req.Context(), in)
 	if err != nil {
-		r.log.Error().Err(err).Msg("start story")
-		writeError(w, http.StatusInternalServerError, "start failed")
+		switch {
+		case errors.Is(err, domain.ErrUnsafeTopic):
+			writeError(w, http.StatusBadRequest, "that topic isn't a good fit for this gamebook -- please try another")
+		case errors.Is(err, domain.ErrTopicLength):
+			writeError(w, http.StatusBadRequest, "topic must be between 3 and 200 characters")
+		default:
+			r.log.Error().Err(err).Msg("start story")
+			writeError(w, http.StatusInternalServerError, "start failed")
+		}
 		return
 	}
 	writeJSON(w, http.StatusCreated, out)

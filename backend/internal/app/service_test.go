@@ -90,7 +90,7 @@ func TestService_StartStory_ImageFailure_StillReturnsPage(t *testing.T) {
 	ip := &fakeImageProvider{err: errors.New("boom")}
 
 	svc := newSvc(sp, ip)
-	out, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "x"})
+	out, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "xyz-topic"})
 
 	require.NoError(t, err, "image failure must not fail the page")
 	assert.Equal(t, "", out.Page.ImageURL)
@@ -103,7 +103,7 @@ func TestService_StartStory_TextFailure_ReturnsWrappedError(t *testing.T) {
 	ip := &fakeImageProvider{}
 
 	svc := newSvc(sp, ip)
-	_, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "x"})
+	_, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "xyz-topic"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "app: next page")
 }
@@ -116,7 +116,7 @@ func TestService_ProgressStory_HappyPath(t *testing.T) {
 	ip := &fakeImageProvider{res: ports.ImageResult{URL: "u", Provider: "fal"}}
 
 	svc := newSvc(sp, ip)
-	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "t"})
+	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "the-topic"})
 	require.NoError(t, err)
 
 	next, err := svc.ProgressStory(context.Background(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 0})
@@ -130,7 +130,7 @@ func TestService_ProgressStory_InvalidChoice(t *testing.T) {
 	ip := &fakeImageProvider{res: ports.ImageResult{URL: "u", Provider: "fal"}}
 
 	svc := newSvc(sp, ip)
-	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "t"})
+	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "the-topic"})
 	require.NoError(t, err)
 
 	_, err = svc.ProgressStory(context.Background(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 99})
@@ -155,7 +155,7 @@ func TestService_ProgressStory_EndedStoryRejected(t *testing.T) {
 	ip := &fakeImageProvider{}
 
 	svc := newSvc(sp, ip)
-	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "t"})
+	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "the-topic"})
 	require.NoError(t, err)
 	require.True(t, start.Page.IsEnding)
 
@@ -168,7 +168,7 @@ func TestService_GetStory(t *testing.T) {
 	ip := &fakeImageProvider{}
 
 	svc := newSvc(sp, ip)
-	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "t"})
+	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "the-topic"})
 	require.NoError(t, err)
 
 	got, err := svc.GetStory(context.Background(), start.StoryID)

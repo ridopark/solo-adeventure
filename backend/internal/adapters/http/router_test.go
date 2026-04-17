@@ -127,7 +127,7 @@ func TestRouter_GetStory_404(t *testing.T) {
 func TestRouter_ChooseStory_FullFlow(t *testing.T) {
 	srv := newServer(t, draftPage("first", 2), draftPage("second", 2))
 
-	code, body := do(t, http.MethodPost, srv.URL+"/stories", `{"topic":"x"}`)
+	code, body := do(t, http.MethodPost, srv.URL+"/stories", `{"topic":"xyz-topic"}`)
 	require.Equal(t, http.StatusCreated, code)
 	var start domain.StartStoryOutput
 	require.NoError(t, json.Unmarshal([]byte(body), &start))
@@ -145,7 +145,7 @@ func TestRouter_ChooseStory_FullFlow(t *testing.T) {
 
 func TestRouter_ChooseStory_InvalidChoice400(t *testing.T) {
 	srv := newServer(t, draftPage("first", 2))
-	code, body := do(t, http.MethodPost, srv.URL+"/stories", `{"topic":"x"}`)
+	code, body := do(t, http.MethodPost, srv.URL+"/stories", `{"topic":"xyz-topic"}`)
 	require.Equal(t, http.StatusCreated, code)
 	var start domain.StartStoryOutput
 	require.NoError(t, json.Unmarshal([]byte(body), &start))

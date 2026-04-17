@@ -102,7 +102,7 @@ func (f *Fal) Generate(ctx context.Context, req ports.ImageRequest) (ports.Image
 }
 
 func buildFalPrompt(stylePrefix, userPrompt string) string {
-	const suffix = "no text, no letters, no words."
+	const suffix = "safe for work, no nudity, no minors in unsafe contexts, no graphic violence, no text, no letters, no words."
 	parts := make([]string, 0, 3)
 	if s := strings.TrimSpace(stylePrefix); s != "" {
 		parts = append(parts, s)

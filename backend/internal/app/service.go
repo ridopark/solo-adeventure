@@ -37,6 +37,9 @@ func NewService(store ports.StoryStore, sp ports.StoryProvider, ip ports.ImagePr
 }
 
 func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (domain.StartStoryOutput, error) {
+	if err := domain.ValidateTopic(in.Topic); err != nil {
+		return domain.StartStoryOutput{}, err
+	}
 	style, err := s.story.StartStyle(ctx, in.Topic)
 	if err != nil {
 		return domain.StartStoryOutput{}, fmt.Errorf("app: start style: %w", err)
@@ -186,14 +189,18 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 
 	g, gctx := errgroup.WithContext(ctx)
 	var imgRes ports.ImageResult
-	g.Go(func() error {
-		r, err := s.images.Generate(gctx, ports.ImageRequest{Prompt: draft.ImagePrompt, StylePrefix: story.StylePrefix})
-		imgRes = r
-		return err
-	})
+	if err := domain.ValidateImagePrompt(draft.ImagePrompt); err != nil {
+		s.log.Warn().Str("story_id", story.ID).Int("seq", seq).Msg("image prompt rejected by safety filter; skipping image")
+	} else {
+		g.Go(func() error {
+			r, err := s.images.Generate(gctx, ports.ImageRequest{Prompt: draft.ImagePrompt, StylePrefix: story.StylePrefix})
+			imgRes = r
+			return err
+		})
+	}
 	if err := g.Wait(); err != nil {
 		s.log.Warn().Err(err).Str("story_id", story.ID).Int("seq", seq).Msg("image generation failed; continuing without image")
-	} else {
+	} else if imgRes.URL != "" {
 		page.ImageURL = imgRes.URL
 		page.ImageProvider = imgRes.Provider
 		s.notifier.Notify(ports.NotifyEvent{
