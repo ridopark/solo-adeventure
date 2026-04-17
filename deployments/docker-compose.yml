@@ -1,0 +1,31 @@
+services:
+  solo-adeventure-server:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    container_name: solo-adeventure-server
+    ports:
+      - "8084:8084"
+    environment:
+      - PORT=8084
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      - TOGETHER_API_KEY=${TOGETHER_API_KEY}
+      - FAL_KEY=${FAL_KEY}
+      - STORY_PROVIDER=${STORY_PROVIDER:-anthropic}
+      - IMAGE_PRIMARY=${IMAGE_PRIMARY:-together}
+      - IMAGE_FALLBACK=${IMAGE_FALLBACK:-fal}
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-http://localhost:3004}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+
+  web:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.web
+    container_name: solo-adeventure-web
+    depends_on:
+      - solo-adeventure-server
+    ports:
+      - "3004:3004"
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8084}

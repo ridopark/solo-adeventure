@@ -1,0 +1,20 @@
+[Unit]
+Description=solo-adeventure server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/solo-adeventure
+ExecStart=/opt/solo-adeventure/solo-adeventure-server
+EnvironmentFile=/opt/solo-adeventure/.env
+Restart=on-failure
+RestartSec=5
+
+ProtectSystem=strict
+ReadWritePaths=/opt/solo-adeventure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

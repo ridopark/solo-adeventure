@@ -1,0 +1,158 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Test
+        working-directory: backend
+        run: go test -race ./...
+
+      - name: Build (verify compilation, ARM64 target)
+        working-directory: backend
+        run: GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/solo-adeventure-server
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Build static export
+        working-directory: apps/web
+        env:
+          STATIC_EXPORT: "1"
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+        run: npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-out
+          path: apps/web/out/
+
+  deploy-frontend:
+    needs: [test, frontend-build]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-out
+          path: out/
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler pages deploy out/ --project-name=solo-adeventure
+
+  deploy-backend:
+    needs: [test]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Build arm64 binary
+        working-directory: backend
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o solo-adeventure-server ./cmd/solo-adeventure-server
+
+      - name: Ensure target dir on OCI
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            sudo mkdir -p /opt/solo-adeventure
+            sudo chown ubuntu:ubuntu /opt/solo-adeventure
+
+      - name: Copy binary to OCI
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          source: backend/solo-adeventure-server
+          target: /opt/solo-adeventure/
+          strip_components: 1
+
+      - name: Install/restart service
+        uses: appleboy/ssh-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+          FAL_KEY: ${{ secrets.FAL_KEY }}
+          CORS_ALLOW_ORIGIN: ${{ secrets.CORS_ALLOW_ORIGIN }}
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          envs: ANTHROPIC_API_KEY,TOGETHER_API_KEY,FAL_KEY,CORS_ALLOW_ORIGIN
+          script: |
+            cat > /opt/solo-adeventure/.env << ENVEOF
+            PORT=8084
+            LOG_LEVEL=info
+            STORY_PROVIDER=anthropic
+            ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+            ANTHROPIC_MODEL=claude-sonnet-4-6
+            IMAGE_PRIMARY=together
+            IMAGE_FALLBACK=fal
+            TOGETHER_API_KEY=${TOGETHER_API_KEY}
+            FAL_KEY=${FAL_KEY}
+            CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN}
+            ENVEOF
+
+            if [ ! -f /etc/systemd/system/solo-adeventure-server.service ]; then
+              sudo tee /etc/systemd/system/solo-adeventure-server.service << 'SVCEOF'
+            [Unit]
+            Description=solo-adeventure server
+            After=network.target
+
+            [Service]
+            Type=simple
+            User=ubuntu
+            WorkingDirectory=/opt/solo-adeventure
+            ExecStart=/opt/solo-adeventure/solo-adeventure-server
+            EnvironmentFile=/opt/solo-adeventure/.env
+            Restart=on-failure
+            RestartSec=5
+            ProtectSystem=strict
+            ReadWritePaths=/opt/solo-adeventure
+            NoNewPrivileges=true
+            PrivateTmp=true
+
+            [Install]
+            WantedBy=multi-user.target
+            SVCEOF
+              sudo systemctl daemon-reload
+              sudo systemctl enable solo-adeventure-server
+            fi
+
+            chmod +x /opt/solo-adeventure/solo-adeventure-server
+            sudo systemctl restart solo-adeventure-server
+            sleep 2
+            sudo systemctl is-active solo-adeventure-server
+            curl -sf http://localhost:8084/health && echo "health ok"
