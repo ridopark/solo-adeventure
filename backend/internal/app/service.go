@@ -15,22 +15,24 @@ import (
 )
 
 type Service struct {
-	stories ports.StoryStore
-	story   ports.StoryProvider
-	images  ports.ImageProvider
-	log     zerolog.Logger
-	now     func() time.Time
-	newID   func() string
+	stories  ports.StoryStore
+	story    ports.StoryProvider
+	images   ports.ImageProvider
+	notifier ports.Notifier
+	log      zerolog.Logger
+	now      func() time.Time
+	newID    func() string
 }
 
-func NewService(store ports.StoryStore, sp ports.StoryProvider, ip ports.ImageProvider, log zerolog.Logger) *Service {
+func NewService(store ports.StoryStore, sp ports.StoryProvider, ip ports.ImageProvider, notifier ports.Notifier, log zerolog.Logger) *Service {
 	return &Service{
-		stories: store,
-		story:   sp,
-		images:  ip,
-		log:     log.With().Str("component", "app.service").Logger(),
-		now:     func() time.Time { return time.Now().UTC() },
-		newID:   func() string { return uuid.NewString() },
+		stories:  store,
+		story:    sp,
+		images:   ip,
+		notifier: notifier,
+		log:      log.With().Str("component", "app.service").Logger(),
+		now:      func() time.Time { return time.Now().UTC() },
+		newID:    func() string { return uuid.NewString() },
 	}
 }
 
@@ -50,6 +52,16 @@ func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (do
 	if err := s.stories.Create(ctx, story); err != nil {
 		return domain.StartStoryOutput{}, fmt.Errorf("app: create story: %w", err)
 	}
+
+	s.notifier.Notify(ports.NotifyEvent{
+		Kind:    ports.NotifyTopicSubmitted,
+		StoryID: story.ID,
+		Title:   "New adventure started",
+		Message: in.Topic,
+		Fields: []ports.NotifyField{
+			{Name: "style", Value: string(style)},
+		},
+	})
 
 	page, err := s.generatePage(ctx, story, "", "", 0)
 	if err != nil {
@@ -79,7 +91,18 @@ func (s *Service) ProgressStory(ctx context.Context, in domain.ProgressInput) (d
 		return domain.ProgressOutput{}, domain.ErrInvalidChoice
 	}
 
-	page, err := s.generatePage(ctx, story, cur.RunningSummary, cur.Choices[in.ChoiceIndex].Label, cur.Index+1)
+	chosen := cur.Choices[in.ChoiceIndex].Label
+	s.notifier.Notify(ports.NotifyEvent{
+		Kind:    ports.NotifyChoiceMade,
+		StoryID: story.ID,
+		Title:   fmt.Sprintf("Choice on page %d", cur.Index+1),
+		Message: chosen,
+		Fields: []ports.NotifyField{
+			{Name: "choiceIndex", Value: fmt.Sprintf("%d", in.ChoiceIndex)},
+		},
+	})
+
+	page, err := s.generatePage(ctx, story, cur.RunningSummary, chosen, cur.Index+1)
 	if err != nil {
 		return domain.ProgressOutput{}, err
 	}
@@ -88,6 +111,28 @@ func (s *Service) ProgressStory(ctx context.Context, in domain.ProgressInput) (d
 
 func (s *Service) GetStory(ctx context.Context, id string) (domain.Story, error) {
 	return s.stories.Get(ctx, id)
+}
+
+func (s *Service) RecordVisit(_ context.Context, in domain.VisitInput) {
+	path := in.Path
+	if path == "" {
+		path = "/"
+	}
+	fields := []ports.NotifyField{
+		{Name: "path", Value: path},
+	}
+	if in.Referrer != "" {
+		fields = append(fields, ports.NotifyField{Name: "referrer", Value: in.Referrer})
+	}
+	if in.UserAgent != "" {
+		fields = append(fields, ports.NotifyField{Name: "user agent", Value: truncate(in.UserAgent, 180)})
+	}
+	s.notifier.Notify(ports.NotifyEvent{
+		Kind:    ports.NotifyVisitStarted,
+		Title:   "A reader arrived",
+		Message: "",
+		Fields:  fields,
+	})
 }
 
 func (s *Service) GenerateImage(ctx context.Context, in domain.GenerateImageInput) (domain.GenerateImageOutput, error) {
@@ -123,6 +168,22 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 		CreatedAt:      s.now(),
 	}
 
+	pageFields := []ports.NotifyField{
+		{Name: "page", Value: fmt.Sprintf("%d", seq+1)},
+	}
+	if page.IsEnding {
+		pageFields = append(pageFields, ports.NotifyField{Name: "ending", Value: string(page.EndingType)})
+	} else {
+		pageFields = append(pageFields, ports.NotifyField{Name: "choices", Value: fmt.Sprintf("%d", len(page.Choices))})
+	}
+	s.notifier.Notify(ports.NotifyEvent{
+		Kind:    ports.NotifyPageGenerated,
+		StoryID: story.ID,
+		Title:   fmt.Sprintf("Page %d generated", seq+1),
+		Message: truncate(page.Narrative, 300),
+		Fields:  pageFields,
+	})
+
 	g, gctx := errgroup.WithContext(ctx)
 	var imgRes ports.ImageResult
 	g.Go(func() error {
@@ -135,6 +196,16 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 	} else {
 		page.ImageURL = imgRes.URL
 		page.ImageProvider = imgRes.Provider
+		s.notifier.Notify(ports.NotifyEvent{
+			Kind:     ports.NotifyImageGenerated,
+			StoryID:  story.ID,
+			Title:    fmt.Sprintf("Page %d illustration", seq+1),
+			Message:  truncate(draft.ImagePrompt, 200),
+			ImageURL: page.ImageURL,
+			Fields: []ports.NotifyField{
+				{Name: "provider", Value: page.ImageProvider},
+			},
+		})
 	}
 
 	if err := s.stories.AppendPage(ctx, story.ID, page); err != nil {
@@ -144,4 +215,11 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 		return domain.Page{}, fmt.Errorf("app: append page: %w", err)
 	}
 	return page, nil
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }

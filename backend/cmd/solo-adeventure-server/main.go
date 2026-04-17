@@ -9,6 +9,7 @@ import (
 	httpadapter "github.com/ridopark/solo-adeventure/backend/internal/adapters/http"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/image"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/llm"
+	"github.com/ridopark/solo-adeventure/backend/internal/adapters/notifier"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/store"
 	"github.com/ridopark/solo-adeventure/backend/internal/app"
 	"github.com/ridopark/solo-adeventure/backend/internal/config"
@@ -26,8 +27,9 @@ func main() {
 	storyStore := store.NewMemory()
 	storyProvider := buildStoryProvider(cfg, llmClient, log)
 	imageProvider := buildImageProvider(cfg, imgClient, log)
+	notif := buildNotifier(cfg, log)
 
-	svc := app.NewService(storyStore, storyProvider, imageProvider, log)
+	svc := app.NewService(storyStore, storyProvider, imageProvider, notif, log)
 
 	handler := httpadapter.NewRouter(svc, log, cfg.CORSAllowOrigin)
 
@@ -63,6 +65,14 @@ func buildOne(name string, cfg config.Config, client *http.Client, log zerolog.L
 		log.Fatal().Str("provider", name).Msg("unknown image provider")
 		return nil
 	}
+}
+
+func buildNotifier(cfg config.Config, log zerolog.Logger) ports.Notifier {
+	if cfg.DiscordWebhookURL == "" {
+		log.Info().Msg("DISCORD_WEBHOOK_URL unset; notifications disabled")
+		return notifier.NewNoop()
+	}
+	return notifier.NewDiscord(cfg.DiscordWebhookURL, log)
 }
 
 func buildStoryProvider(cfg config.Config, client *http.Client, log zerolog.Logger) ports.StoryProvider {

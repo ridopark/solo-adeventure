@@ -41,6 +41,10 @@ func (stubImage) Generate(ctx context.Context, req ports.ImageRequest) (ports.Im
 	return ports.ImageResult{URL: "https://img/1.png", Provider: "stub"}, nil
 }
 
+type stubNotifier struct{}
+
+func (stubNotifier) Notify(_ ports.NotifyEvent) {}
+
 func draftPage(narrative string, choices int) domain.PageDraft {
 	cs := make([]domain.Choice, choices)
 	for i := range cs {
@@ -55,6 +59,7 @@ func newServer(t *testing.T, drafts ...domain.PageDraft) *httptest.Server {
 		store.NewMemory(),
 		&stubStory{style: "style-x", drafts: drafts},
 		stubImage{},
+		stubNotifier{},
 		zerolog.Nop(),
 	)
 	handler := NewRouter(svc, zerolog.Nop(), "*")

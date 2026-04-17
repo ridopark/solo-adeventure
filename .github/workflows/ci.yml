@@ -106,11 +106,12 @@ jobs:
           TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
           FAL_KEY: ${{ secrets.FAL_KEY }}
           CORS_ALLOW_ORIGIN: ${{ secrets.CORS_ALLOW_ORIGIN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          envs: ANTHROPIC_API_KEY,TOGETHER_API_KEY,FAL_KEY,CORS_ALLOW_ORIGIN
+          envs: ANTHROPIC_API_KEY,TOGETHER_API_KEY,FAL_KEY,CORS_ALLOW_ORIGIN,DISCORD_WEBHOOK_URL
           script: |
             cat > /opt/solo-adeventure/.env << ENVEOF
             PORT=8084
@@ -123,6 +124,7 @@ jobs:
             TOGETHER_API_KEY=${TOGETHER_API_KEY}
             FAL_KEY=${FAL_KEY}
             CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN}
+            DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
             ENVEOF
 
             if [ ! -f /etc/systemd/system/solo-adeventure-server.service ]; then

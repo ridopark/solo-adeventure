@@ -58,8 +58,14 @@ func draft(narrative string, choices int) domain.PageDraft {
 	}
 }
 
+type capturingNotifier struct {
+	events []ports.NotifyEvent
+}
+
+func (c *capturingNotifier) Notify(ev ports.NotifyEvent) { c.events = append(c.events, ev) }
+
 func newSvc(sp ports.StoryProvider, ip ports.ImageProvider) *Service {
-	return NewService(store.NewMemory(), sp, ip, zerolog.Nop())
+	return NewService(store.NewMemory(), sp, ip, &capturingNotifier{}, zerolog.Nop())
 }
 
 func TestService_StartStory_HappyPath(t *testing.T) {

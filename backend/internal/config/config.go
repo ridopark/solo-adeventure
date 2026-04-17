@@ -19,6 +19,7 @@ type Config struct {
 	ImageFallback     string
 	LLMTimeout        time.Duration
 	ImageTimeout      time.Duration
+	DiscordWebhookURL string
 }
 
 func Load() Config {
@@ -33,8 +34,9 @@ func Load() Config {
 		StoryProvider:   getenv("STORY_PROVIDER", "anthropic"),
 		ImagePrimary:    getenv("IMAGE_PRIMARY", "together"),
 		ImageFallback:   getenv("IMAGE_FALLBACK", "fal"),
-		LLMTimeout:      getDuration("LLM_TIMEOUT", 45*time.Second),
-		ImageTimeout:    getDuration("IMAGE_TIMEOUT", 30*time.Second),
+		LLMTimeout:         getDuration("LLM_TIMEOUT", 45*time.Second),
+		ImageTimeout:       getDuration("IMAGE_TIMEOUT", 30*time.Second),
+		DiscordWebhookURL:  os.Getenv("DISCORD_WEBHOOK_URL"),
 	}
 }
 

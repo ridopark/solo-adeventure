@@ -40,3 +40,31 @@ type StoryStore interface {
 	Get(ctx context.Context, id string) (domain.Story, error)
 	AppendPage(ctx context.Context, storyID string, p domain.Page) error
 }
+
+type NotifyKind string
+
+const (
+	NotifyTopicSubmitted NotifyKind = "topic_submitted"
+	NotifyPageGenerated  NotifyKind = "page_generated"
+	NotifyImageGenerated NotifyKind = "image_generated"
+	NotifyChoiceMade     NotifyKind = "choice_made"
+	NotifyVisitStarted   NotifyKind = "visit_started"
+)
+
+type NotifyField struct {
+	Name  string
+	Value string
+}
+
+type NotifyEvent struct {
+	Kind     NotifyKind
+	StoryID  string
+	Title    string
+	Message  string
+	ImageURL string
+	Fields   []NotifyField
+}
+
+type Notifier interface {
+	Notify(event NotifyEvent)
+}

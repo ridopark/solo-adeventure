@@ -25,4 +25,13 @@ export const api = {
       body: JSON.stringify({ choiceIndex }),
     }),
   getStory: (storyId: string) => request<Story>(`/stories/${storyId}`),
+  visit: (path: string) =>
+    request<{ status: string }>("/visit", {
+      method: "POST",
+      body: JSON.stringify({
+        path,
+        referrer: typeof document !== "undefined" ? document.referrer : "",
+        userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      }),
+    }).catch(() => ({ status: "ignored" })),
 };

@@ -25,6 +25,7 @@ func NewRouter(svc *app.Service, log zerolog.Logger, corsOrigin string) http.Han
 	mux.HandleFunc("GET /stories/{id}", r.getStory)
 	mux.HandleFunc("POST /stories/{id}/choose", r.chooseStory)
 	mux.HandleFunc("POST /images", r.generateImage)
+	mux.HandleFunc("POST /visit", r.visit)
 
 	var h http.Handler = mux
 	h = cors(corsOrigin, h)
@@ -114,6 +115,16 @@ func (r *Router) generateImage(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (r *Router) visit(w http.ResponseWriter, req *http.Request) {
+	var in domain.VisitInput
+	_ = json.NewDecoder(req.Body).Decode(&in)
+	if in.UserAgent == "" {
+		in.UserAgent = req.Header.Get("User-Agent")
+	}
+	r.svc.RecordVisit(req.Context(), in)
+	writeJSON(w, http.StatusAccepted, map[string]string{"status": "accepted"})
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

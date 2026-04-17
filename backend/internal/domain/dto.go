@@ -28,3 +28,9 @@ type GenerateImageOutput struct {
 	URL      string `json:"url"`
 	Provider string `json:"provider"`
 }
+
+type VisitInput struct {
+	Path      string `json:"path"`
+	Referrer  string `json:"referrer"`
+	UserAgent string `json:"userAgent"`
+}
