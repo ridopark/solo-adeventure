@@ -115,10 +115,10 @@ jobs:
             cat > /opt/solo-adeventure/.env << ENVEOF
             PORT=8084
             LOG_LEVEL=info
-            STORY_PROVIDER=stub
+            STORY_PROVIDER=anthropic
             ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
             ANTHROPIC_MODEL=claude-sonnet-4-6
-            IMAGE_PRIMARY=stub
+            IMAGE_PRIMARY=together
             IMAGE_FALLBACK=
             TOGETHER_API_KEY=${TOGETHER_API_KEY}
             FAL_KEY=${FAL_KEY}
