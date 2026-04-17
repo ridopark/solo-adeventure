@@ -20,31 +20,58 @@ export function TopicInput() {
       sessionStorage.setItem(`solo-adv:seed:${res.storyId}`, JSON.stringify(res));
       router.push(`/story?id=${encodeURIComponent(res.storyId)}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to start");
+      const msg = err instanceof Error ? err.message : "failed to start";
+      setError(extractError(msg));
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4 text-left">
       <label className="block space-y-2">
-        <span className="text-sm text-stone-600">Your topic</span>
+        <span className="uppercase tracking-[0.15em] text-xs text-[var(--stone-gray)]">
+          Your topic
+        </span>
         <input
           autoFocus
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="a lighthouse keeper in 1912"
-          className="w-full px-4 py-3 rounded-sm border border-stone-400 bg-[#fbf6ea] focus:outline-none focus:border-stone-700"
+          className="w-full px-4 py-3 rounded-xl bg-white font-serif text-lg focus:outline-none transition"
+          style={{
+            border: "1px solid var(--border-warm)",
+            color: "var(--near-black)",
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--terracotta)")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border-warm)")}
         />
       </label>
       <button
         type="submit"
         disabled={!topic.trim() || busy}
-        className="w-full px-5 py-3 border border-stone-700 rounded-sm bg-stone-900 text-stone-50 hover:bg-stone-800 disabled:opacity-40 transition"
+        className="w-full px-5 py-3 rounded-xl font-medium text-base transition disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          background: "var(--terracotta)",
+          color: "var(--ivory)",
+          boxShadow: "var(--terracotta) 0px 0px 0px 1px",
+        }}
+        onMouseEnter={(e) => {
+          if (!busy && topic.trim()) e.currentTarget.style.background = "var(--coral)";
+        }}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "var(--terracotta)")}
       >
         {busy ? "Opening the book..." : "Begin"}
       </button>
-      {error && <p className="text-sm text-rose-700">{error}</p>}
+      {error && (
+        <p className="text-sm" style={{ color: "var(--crimson)" }}>
+          {error}
+        </p>
+      )}
     </form>
   );
+}
+
+function extractError(msg: string): string {
+  const m = msg.match(/"error":"([^"]+)"/);
+  return m ? m[1] : msg;
 }

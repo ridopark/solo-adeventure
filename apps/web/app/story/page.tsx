@@ -9,7 +9,7 @@ function StoryScreen() {
   const id = params.get("id");
   if (!id) {
     return (
-      <p className="text-rose-700">
+      <p style={{ color: "var(--crimson)" }}>
         Missing story id. Start a new adventure from the home page.
       </p>
     );
@@ -19,8 +19,10 @@ function StoryScreen() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<p className="text-stone-500">Loading...</p>}>
-      <StoryScreen />
-    </Suspense>
+    <main className="mx-auto max-w-2xl px-6 py-10">
+      <Suspense fallback={<p style={{ color: "var(--stone-gray)" }}>Loading...</p>}>
+        <StoryScreen />
+      </Suspense>
+    </main>
   );
 }

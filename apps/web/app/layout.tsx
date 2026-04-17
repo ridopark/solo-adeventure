@@ -3,16 +3,17 @@ import { VisitPing } from "@/components/VisitPing";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "solo-adeventure",
-  description: "Your own choose-your-own-adventure, powered by Claude.",
+  title: "solo-adeventure -- a choose-your-own-adventure gamebook",
+  description:
+    "Pick a topic. Claude writes each page of your adventure as you turn it; FLUX illustrates. No two tales alike.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[#f5efe1] text-stone-900 font-serif antialiased">
+      <body className="min-h-screen antialiased" style={{ background: "var(--parchment)", color: "var(--near-black)" }}>
         <VisitPing />
-        <main className="mx-auto max-w-2xl px-6 py-10">{children}</main>
+        {children}
       </body>
     </html>
   );
