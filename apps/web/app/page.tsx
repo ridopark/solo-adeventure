@@ -1,19 +1,16 @@
+import Link from "next/link";
 import { TopicInput } from "@/components/TopicInput";
+import { AuthNav } from "@/components/AuthNav";
 
 export default function LandingPage() {
   return (
     <div>
       <nav className="border-b border-[var(--border-cream)]">
         <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-          <span className="font-serif text-xl tracking-tight">solo-adeventure</span>
-          <a
-            href="https://github.com/ridopark/solo-adeventure"
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-[var(--olive-gray)] hover:text-[var(--near-black)] transition"
-          >
-            source
-          </a>
+          <Link href="/" className="font-serif text-xl tracking-tight">
+            solo-adeventure
+          </Link>
+          <AuthNav />
         </div>
       </nav>
 

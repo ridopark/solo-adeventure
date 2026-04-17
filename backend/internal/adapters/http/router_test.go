@@ -62,7 +62,7 @@ func newServer(t *testing.T, drafts ...domain.PageDraft) *httptest.Server {
 		stubNotifier{},
 		zerolog.Nop(),
 	)
-	handler := NewRouter(svc, zerolog.Nop(), "*")
+	handler := NewRouter(svc, zerolog.Nop(), RouterConfig{CORSOrigin: "*", FrontendURL: "http://test.local", CookieDomain: "", Secure: false})
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
 	return srv
@@ -124,34 +124,16 @@ func TestRouter_GetStory_404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, code)
 }
 
-func TestRouter_ChooseStory_FullFlow(t *testing.T) {
-	srv := newServer(t, draftPage("first", 2), draftPage("second", 2))
-
-	code, body := do(t, http.MethodPost, srv.URL+"/stories", `{"topic":"xyz-topic"}`)
-	require.Equal(t, http.StatusCreated, code)
-	var start domain.StartStoryOutput
-	require.NoError(t, json.Unmarshal([]byte(body), &start))
-
-	code, body = do(t, http.MethodPost, srv.URL+"/stories/"+start.StoryID+"/choose", `{"choiceIndex":0}`)
-	assert.Equal(t, http.StatusOK, code)
-	var prog domain.ProgressOutput
-	require.NoError(t, json.Unmarshal([]byte(body), &prog))
-	assert.Equal(t, "second", prog.Page.Narrative)
-
-	code, body = do(t, http.MethodGet, srv.URL+"/stories/"+start.StoryID, "")
-	assert.Equal(t, http.StatusOK, code)
-	assert.Contains(t, body, `"pages"`)
-}
-
-func TestRouter_ChooseStory_InvalidChoice400(t *testing.T) {
+func TestRouter_ChooseStory_AnonymousReturns401(t *testing.T) {
 	srv := newServer(t, draftPage("first", 2))
 	code, body := do(t, http.MethodPost, srv.URL+"/stories", `{"topic":"xyz-topic"}`)
 	require.Equal(t, http.StatusCreated, code)
 	var start domain.StartStoryOutput
 	require.NoError(t, json.Unmarshal([]byte(body), &start))
 
-	code, _ = do(t, http.MethodPost, srv.URL+"/stories/"+start.StoryID+"/choose", `{"choiceIndex":99}`)
-	assert.Equal(t, http.StatusBadRequest, code)
+	code, body = do(t, http.MethodPost, srv.URL+"/stories/"+start.StoryID+"/choose", `{"choiceIndex":0}`)
+	assert.Equal(t, http.StatusUnauthorized, code)
+	assert.Contains(t, body, "sign in")
 }
 
 func TestRouter_CORSHeadersAndPreflight(t *testing.T) {

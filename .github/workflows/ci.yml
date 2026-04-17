@@ -107,11 +107,13 @@ jobs:
           FAL_KEY: ${{ secrets.FAL_KEY }}
           CORS_ALLOW_ORIGIN: ${{ secrets.CORS_ALLOW_ORIGIN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
         with:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          envs: ANTHROPIC_API_KEY,TOGETHER_API_KEY,FAL_KEY,CORS_ALLOW_ORIGIN,DISCORD_WEBHOOK_URL
+          envs: ANTHROPIC_API_KEY,TOGETHER_API_KEY,FAL_KEY,CORS_ALLOW_ORIGIN,DISCORD_WEBHOOK_URL,GOOGLE_OAUTH_CLIENT_ID,GOOGLE_OAUTH_CLIENT_SECRET
           script: |
             cat > /opt/solo-adeventure/.env << ENVEOF
             PORT=8084
@@ -125,6 +127,14 @@ jobs:
             FAL_KEY=${FAL_KEY}
             CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN}
             DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+            OAUTH_PROVIDER=google
+            GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+            GOOGLE_OAUTH_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
+            GOOGLE_REDIRECT_URI=https://solo-adeventure-api.ridopark.com/auth/google/callback
+            FRONTEND_URL=https://solo-adeventure.ridopark.com
+            COOKIE_DOMAIN=.ridopark.com
+            COOKIE_SECURE=true
+            DB_PATH=/opt/solo-adeventure/solo-adeventure.db
             ENVEOF
 
             if [ ! -f /etc/systemd/system/solo-adeventure-server.service ]; then

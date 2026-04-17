@@ -19,7 +19,15 @@ type Config struct {
 	ImageFallback     string
 	LLMTimeout        time.Duration
 	ImageTimeout      time.Duration
-	DiscordWebhookURL string
+	DiscordWebhookURL   string
+	DBPath              string
+	FrontendURL         string
+	CookieDomain        string
+	CookieSecure        bool
+	GoogleOAuthClientID string
+	GoogleOAuthSecret   string
+	GoogleRedirectURI   string
+	OAuthProvider       string
 }
 
 func Load() Config {
@@ -37,6 +45,14 @@ func Load() Config {
 		LLMTimeout:         getDuration("LLM_TIMEOUT", 45*time.Second),
 		ImageTimeout:       getDuration("IMAGE_TIMEOUT", 30*time.Second),
 		DiscordWebhookURL:  os.Getenv("DISCORD_WEBHOOK_URL"),
+		DBPath:              getenv("DB_PATH", "/opt/solo-adeventure/solo-adeventure.db"),
+		FrontendURL:         getenv("FRONTEND_URL", "http://localhost:3004"),
+		CookieDomain:        os.Getenv("COOKIE_DOMAIN"),
+		CookieSecure:        getenv("COOKIE_SECURE", "true") == "true",
+		GoogleOAuthClientID: os.Getenv("GOOGLE_OAUTH_CLIENT_ID"),
+		GoogleOAuthSecret:   os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+		GoogleRedirectURI:   getenv("GOOGLE_REDIRECT_URI", "http://localhost:8084/auth/google/callback"),
+		OAuthProvider:       getenv("OAUTH_PROVIDER", "google"),
 	}
 }
 

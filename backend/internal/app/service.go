@@ -19,6 +19,9 @@ type Service struct {
 	story    ports.StoryProvider
 	images   ports.ImageProvider
 	notifier ports.Notifier
+	users    ports.UserStore
+	sessions ports.SessionStore
+	oauth    ports.OAuthProvider
 	log      zerolog.Logger
 	now      func() time.Time
 	newID    func() string
@@ -36,6 +39,15 @@ func NewService(store ports.StoryStore, sp ports.StoryProvider, ip ports.ImagePr
 	}
 }
 
+// WithAuth wires optional auth collaborators. Called after NewService when the
+// process has SQLite-backed user/session stores and a Google OAuth client.
+func (s *Service) WithAuth(users ports.UserStore, sessions ports.SessionStore, oauth ports.OAuthProvider) *Service {
+	s.users = users
+	s.sessions = sessions
+	s.oauth = oauth
+	return s
+}
+
 func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (domain.StartStoryOutput, error) {
 	if err := domain.ValidateTopic(in.Topic); err != nil {
 		return domain.StartStoryOutput{}, err
@@ -47,6 +59,7 @@ func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (do
 
 	story := domain.Story{
 		ID:          s.newID(),
+		UserID:      CurrentUserID(ctx),
 		Topic:       in.Topic,
 		StylePrefix: style,
 		CreatedAt:   s.now(),
@@ -79,9 +92,21 @@ func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (do
 }
 
 func (s *Service) ProgressStory(ctx context.Context, in domain.ProgressInput) (domain.ProgressOutput, error) {
+	userID := CurrentUserID(ctx)
+	if userID == "" {
+		return domain.ProgressOutput{}, domain.ErrUnauthorized
+	}
 	story, err := s.stories.Get(ctx, in.StoryID)
 	if err != nil {
 		return domain.ProgressOutput{}, err
+	}
+	if story.UserID != "" && story.UserID != userID {
+		return domain.ProgressOutput{}, domain.ErrForbidden
+	}
+	if story.UserID == "" {
+		if err := s.stories.AttachUser(ctx, story.ID, userID); err == nil {
+			story.UserID = userID
+		}
 	}
 	cur := story.Current()
 	if cur == nil {

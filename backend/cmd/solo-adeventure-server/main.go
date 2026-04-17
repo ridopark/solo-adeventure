@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/ridopark/solo-adeventure/backend/internal/adapters/auth"
 	httpadapter "github.com/ridopark/solo-adeventure/backend/internal/adapters/http"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/image"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/llm"
@@ -24,21 +25,34 @@ func main() {
 	imgClient := &http.Client{Timeout: cfg.ImageTimeout}
 	llmClient := &http.Client{Timeout: cfg.LLMTimeout}
 
-	storyStore := store.NewMemory()
+	db, err := store.NewSQLite(cfg.DBPath)
+	if err != nil {
+		log.Fatal().Err(err).Str("path", cfg.DBPath).Msg("open sqlite")
+	}
+	defer db.Close()
+
 	storyProvider := buildStoryProvider(cfg, llmClient, log)
 	imageProvider := buildImageProvider(cfg, imgClient, log)
 	notif := buildNotifier(cfg, log)
 
-	svc := app.NewService(storyStore, storyProvider, imageProvider, notif, log)
+	oauthProvider := buildOAuth(cfg, log)
 
-	handler := httpadapter.NewRouter(svc, log, cfg.CORSAllowOrigin)
+	svc := app.NewService(db, storyProvider, imageProvider, notif, log).
+		WithAuth(db.Users(), db.Sessions(), oauthProvider)
+
+	handler := httpadapter.NewRouter(svc, log, httpadapter.RouterConfig{
+		CORSOrigin:   cfg.CORSAllowOrigin,
+		FrontendURL:  cfg.FrontendURL,
+		CookieDomain: cfg.CookieDomain,
+		Secure:       cfg.CookieSecure,
+	})
 
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	log.Info().Str("port", cfg.Port).Msg("solo-adeventure-server listening")
+	log.Info().Str("port", cfg.Port).Str("db", cfg.DBPath).Msg("solo-adeventure-server listening")
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal().Err(err).Msg("server terminated")
 	}
@@ -81,4 +95,12 @@ func buildStoryProvider(cfg config.Config, client *http.Client, log zerolog.Logg
 		return llm.NewStub()
 	}
 	return llm.NewAnthropic(cfg.AnthropicAPIKey, cfg.AnthropicModel, client, log)
+}
+
+func buildOAuth(cfg config.Config, log zerolog.Logger) ports.OAuthProvider {
+	if cfg.OAuthProvider == "stub" || cfg.GoogleOAuthClientID == "" {
+		log.Warn().Msg("using stub oauth provider -- set GOOGLE_OAUTH_CLIENT_ID to enable real Google sign-in")
+		return auth.NewStub(cfg.FrontendURL)
+	}
+	return auth.NewGoogle(cfg.GoogleOAuthClientID, cfg.GoogleOAuthSecret, cfg.GoogleRedirectURI, nil)
 }

@@ -31,6 +31,7 @@ type Page struct {
 
 type Story struct {
 	ID          string      `json:"storyId"`
+	UserID      string      `json:"userId,omitempty"`
 	Topic       string      `json:"topic"`
 	StylePrefix StylePrefix `json:"stylePrefix"`
 	Pages       []Page      `json:"pages"`

@@ -39,6 +39,25 @@ type StoryStore interface {
 	Create(ctx context.Context, s domain.Story) error
 	Get(ctx context.Context, id string) (domain.Story, error)
 	AppendPage(ctx context.Context, storyID string, p domain.Page) error
+	ListByUser(ctx context.Context, userID string, limit int) ([]domain.Story, error)
+	AttachUser(ctx context.Context, storyID, userID string) error
+}
+
+type UserStore interface {
+	GetByGoogleSub(ctx context.Context, sub string) (domain.User, error)
+	Create(ctx context.Context, u domain.User) error
+	Get(ctx context.Context, id string) (domain.User, error)
+}
+
+type SessionStore interface {
+	Create(ctx context.Context, s domain.Session) error
+	Get(ctx context.Context, id string) (domain.Session, error)
+	Delete(ctx context.Context, id string) error
+}
+
+type OAuthProvider interface {
+	AuthURL(state string) string
+	Exchange(ctx context.Context, code string) (domain.OAuthUserInfo, error)
 }
 
 type NotifyKind string

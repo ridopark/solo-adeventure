@@ -1,10 +1,14 @@
 package http
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/ridopark/solo-adeventure/backend/internal/app"
+	"github.com/ridopark/solo-adeventure/backend/internal/domain"
 )
 
 func cors(origin string, next http.Handler) http.Handler {
@@ -12,9 +16,31 @@ func cors(origin string, next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Vary", "Origin")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+const SessionCookieName = "solo_adv_session"
+
+func session(svc interface {
+	UserBySession(ctx context.Context, id string) (domain.User, error)
+}, log zerolog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := r.Cookie(SessionCookieName)
+		if err == nil && c.Value != "" {
+			user, err := svc.UserBySession(r.Context(), c.Value)
+			if err == nil {
+				ctx := app.WithUser(r.Context(), user.ID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			log.Debug().Err(err).Msg("session lookup miss")
 		}
 		next.ServeHTTP(w, r)
 	})

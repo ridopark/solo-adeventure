@@ -68,6 +68,10 @@ func newSvc(sp ports.StoryProvider, ip ports.ImageProvider) *Service {
 	return NewService(store.NewMemory(), sp, ip, &capturingNotifier{}, zerolog.Nop())
 }
 
+func authCtx() context.Context {
+	return WithUser(context.Background(), "test-user")
+}
+
 func TestService_StartStory_HappyPath(t *testing.T) {
 	sp := &fakeStoryProvider{style: "watercolor", drafts: []domain.PageDraft{draft("opening scene", 2)}}
 	ip := &fakeImageProvider{res: ports.ImageResult{URL: "https://img/1.png", Provider: "together"}}
@@ -119,7 +123,7 @@ func TestService_ProgressStory_HappyPath(t *testing.T) {
 	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "the-topic"})
 	require.NoError(t, err)
 
-	next, err := svc.ProgressStory(context.Background(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 0})
+	next, err := svc.ProgressStory(authCtx(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 0})
 	require.NoError(t, err)
 	assert.Equal(t, "second", next.Page.Narrative)
 	assert.Equal(t, 1, next.Page.Index)
@@ -133,13 +137,13 @@ func TestService_ProgressStory_InvalidChoice(t *testing.T) {
 	start, err := svc.StartStory(context.Background(), domain.StartStoryInput{Topic: "the-topic"})
 	require.NoError(t, err)
 
-	_, err = svc.ProgressStory(context.Background(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 99})
+	_, err = svc.ProgressStory(authCtx(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 99})
 	assert.True(t, errors.Is(err, domain.ErrInvalidChoice))
 }
 
 func TestService_ProgressStory_StoryNotFound(t *testing.T) {
 	svc := newSvc(&fakeStoryProvider{}, &fakeImageProvider{})
-	_, err := svc.ProgressStory(context.Background(), domain.ProgressInput{StoryID: "does-not-exist", ChoiceIndex: 0})
+	_, err := svc.ProgressStory(authCtx(), domain.ProgressInput{StoryID: "does-not-exist", ChoiceIndex: 0})
 	assert.True(t, errors.Is(err, domain.ErrStoryNotFound))
 }
 
@@ -159,7 +163,7 @@ func TestService_ProgressStory_EndedStoryRejected(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, start.Page.IsEnding)
 
-	_, err = svc.ProgressStory(context.Background(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 0})
+	_, err = svc.ProgressStory(authCtx(), domain.ProgressInput{StoryID: start.StoryID, ChoiceIndex: 0})
 	assert.True(t, errors.Is(err, domain.ErrStoryEnded))
 }
 

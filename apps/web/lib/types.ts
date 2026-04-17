@@ -33,3 +33,11 @@ export interface StartStoryResponse {
 export interface ProgressResponse {
   page: Page;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl?: string;
+  createdAt: string;
+}

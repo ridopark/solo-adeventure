@@ -50,3 +50,34 @@ func (m *Memory) AppendPage(_ context.Context, storyID string, p domain.Page) er
 	m.stories[storyID] = s
 	return nil
 }
+
+func (m *Memory) ListByUser(_ context.Context, userID string, limit int) ([]domain.Story, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := make([]domain.Story, 0)
+	for _, s := range m.stories {
+		if s.UserID == userID {
+			out = append(out, s)
+			if limit > 0 && len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func (m *Memory) AttachUser(_ context.Context, storyID, userID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.stories[storyID]
+	if !ok {
+		return domain.ErrStoryNotFound
+	}
+	if s.UserID != "" {
+		return domain.ErrForbidden
+	}
+	s.UserID = userID
+	s.UpdatedAt = m.now()
+	m.stories[storyID] = s
+	return nil
+}

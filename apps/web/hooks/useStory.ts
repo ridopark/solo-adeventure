@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import type { Page, StartStoryResponse, Story } from "@/lib/types";
 import { useLocalStoryCache } from "./useLocalStoryCache";
 
-type Status = "idle" | "hydrating" | "page_ready" | "choosing" | "ended" | "error";
+type Status = "idle" | "hydrating" | "page_ready" | "choosing" | "ended" | "error" | "needs_auth";
 
 interface State {
   status: Status;
@@ -21,6 +21,7 @@ type Action =
   | { type: "choose_start" }
   | { type: "choose_ok"; page: Page }
   | { type: "choose_err"; error: string }
+  | { type: "needs_auth" }
   | { type: "reset" };
 
 const initial: State = { status: "hydrating", pages: [], stylePrefix: "" };
@@ -49,6 +50,8 @@ function reducer(state: State, action: Action): State {
       };
     case "choose_err":
       return { ...state, status: "error", error: action.error };
+    case "needs_auth":
+      return { ...state, status: "needs_auth", error: undefined };
     case "reset":
       return initial;
   }
@@ -109,6 +112,11 @@ export function useStory(storyId: string) {
         const res = await api.choose(storyId, index);
         dispatch({ type: "choose_ok", page: res.page });
       } catch (err) {
+        const status = (err as { status?: number }).status;
+        if (status === 401) {
+          dispatch({ type: "needs_auth" });
+          return;
+        }
         dispatch({
           type: "choose_err",
           error: err instanceof Error ? err.message : "failed",
