@@ -59,7 +59,7 @@ func TestTogether_Generate(t *testing.T) {
 		cap.mu.Lock()
 		defer cap.mu.Unlock()
 		assert.Equal(t, "Bearer sk-test", cap.authHeader)
-		assert.Equal(t, "black-forest-labs/FLUX.1-schnell-Free", cap.body["model"])
+		assert.Equal(t, "black-forest-labs/FLUX.1-schnell", cap.body["model"])
 		assert.Equal(t, "url", cap.body["response_format"])
 		assert.EqualValues(t, 1024, cap.body["width"])
 		assert.EqualValues(t, 1024, cap.body["height"])

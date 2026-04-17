@@ -16,7 +16,7 @@ import (
 
 const (
 	togetherDefaultEndpoint = "https://api.together.xyz/v1/images/generations"
-	togetherDefaultModel    = "black-forest-labs/FLUX.1-schnell-Free"
+	togetherDefaultModel    = "black-forest-labs/FLUX.1-schnell"
 	togetherNoTextSuffix    = "no text, no letters, no words."
 )
 
