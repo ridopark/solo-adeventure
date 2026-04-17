@@ -33,9 +33,11 @@ const systemPromptNextPage = `You are the author of a choose-your-own-adventure 
 - Choice labels: under 80 characters, imperative, second-person.
 
 ## Pacing
-- Target a complete arc within 4 to 8 pages.
-- When Seq >= 5, bend the plot toward resolution.
-- When Seq >= 7, the NEXT page MUST be the ending (isEnding=true, choices=[], pick endingType).
+- Target a complete arc of 4 to 8 pages. A shorter story feels like an abrupt demo, not a gamebook.
+- MINIMUM 4 pages before any ending. Never set isEnding=true if Seq < 3. On those early pages you must keep the story open with 2-3 choices even if the arc feels complete; the tale needs more beats to earn its ending.
+- Seq 3-4: an ending is allowed only if the current beat is genuinely a climax; otherwise continue.
+- Seq 5-6: bend the plot toward resolution; prefer ending over continuing unless there is real unresolved tension.
+- Seq >= 7: the NEXT page MUST be the ending (isEnding=true, choices=[], pick endingType).
 
 ## Endings
 - endingType is one of: victory (triumph), defeat (loss), twist (unexpected but earned).
@@ -195,7 +197,7 @@ func (a *Anthropic) NextPage(ctx context.Context, in ports.StoryProviderInput) (
 	if err != nil {
 		return domain.PageDraft{}, fmt.Errorf("llm.anthropic: NextPage: %w", err)
 	}
-	if err := validateDraft(draft); err != nil {
+	if err := validateDraft(draft, in.Seq); err != nil {
 		return domain.PageDraft{}, fmt.Errorf("llm.anthropic: NextPage: %w", err)
 	}
 	return draft, nil
@@ -203,17 +205,21 @@ func (a *Anthropic) NextPage(ctx context.Context, in ports.StoryProviderInput) (
 
 func buildNextPageUserPrompt(in ports.StoryProviderInput) string {
 	if in.Seq == 0 {
-		return fmt.Sprintf("Topic: %s.\n\nOpen the story on page 1. Set up a clear protagonist situation with three meaningfully divergent choices.", in.Topic)
+		return fmt.Sprintf("Topic: %s.\n\nOpen the story on page 1. Set up a clear protagonist situation with three meaningfully divergent choices. Do NOT end the story yet; this is page 1 of a 4-8 page arc.", in.Topic)
 	}
-	pacing := ""
+	var pacing string
 	switch {
 	case in.Seq >= 7:
-		pacing = "\n\nPACING: this MUST be the final page. Set isEnding=true, return no choices, and pick the endingType that best fits how the arc has played out."
+		pacing = "PACING: this MUST be the final page. Set isEnding=true, return no choices, and pick the endingType that best fits how the arc has played out."
 	case in.Seq >= 5:
-		pacing = "\n\nPACING: the arc should be approaching resolution. Start closing open threads; the ending is 1-2 pages away unless a satisfying conclusion is already reachable here."
+		pacing = "PACING: bend toward resolution. Prefer ending here over continuing unless there is real unresolved tension. If ending, set isEnding=true, no choices, pick endingType."
+	case in.Seq >= 3:
+		pacing = "PACING: an ending is allowed only if this beat is genuinely a climax. Otherwise keep the story open with 2-3 choices."
+	default:
+		pacing = "PACING: do NOT end the story. This is too early. Continue with 2-3 choices; isEnding MUST be false."
 	}
 	return fmt.Sprintf(
-		"Running summary so far: %s\n\nThe reader chose: %q.\n\nWrite page %d. If this is a natural satisfying conclusion, end the story (isEnding=true, no choices, pick endingType).%s",
+		"Running summary so far: %s\n\nThe reader chose: %q.\n\nWrite page %d of a 4-8 page arc.\n\n%s",
 		in.PriorSummary, in.ChosenText, in.Seq+1, pacing,
 	)
 }
@@ -282,11 +288,14 @@ func parseToolUse(resp *anthropicResponse) (domain.PageDraft, error) {
 	return domain.PageDraft{}, errors.New("no tool_use block in response")
 }
 
-func validateDraft(d domain.PageDraft) error {
+func validateDraft(d domain.PageDraft, seq int) error {
 	if strings.TrimSpace(d.Narrative) == "" {
 		return errors.New("validate draft: narrative is empty")
 	}
 	if d.IsEnding {
+		if seq < 3 {
+			return fmt.Errorf("validate draft: ending too early at seq %d; minimum is 3 (page 4)", seq)
+		}
 		switch d.EndingType {
 		case domain.EndingVictory, domain.EndingDefeat, domain.EndingTwist:
 			return nil
