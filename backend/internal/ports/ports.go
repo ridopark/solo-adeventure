@@ -76,12 +76,14 @@ type NotifyField struct {
 }
 
 type NotifyEvent struct {
-	Kind     NotifyKind
-	StoryID  string
-	Title    string
-	Message  string
-	ImageURL string
-	Fields   []NotifyField
+	Kind          NotifyKind
+	StoryID       string
+	Title         string
+	Message       string
+	ImageURL      string
+	Fields        []NotifyField
+	UserName      string
+	UserAvatarURL string
 }
 
 type Notifier interface {

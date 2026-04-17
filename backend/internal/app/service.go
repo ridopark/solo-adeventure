@@ -48,6 +48,24 @@ func (s *Service) WithAuth(users ports.UserStore, sessions ports.SessionStore, o
 	return s
 }
 
+// currentUserAttribution returns name+avatar for the authenticated caller, or
+// empty strings if the request is anonymous or user lookup fails. Used to tag
+// NotifyEvents with a human-readable identity.
+func (s *Service) currentUserAttribution(ctx context.Context) (name, avatar string) {
+	uid := CurrentUserID(ctx)
+	if uid == "" || s.users == nil {
+		return "", ""
+	}
+	u, err := s.users.Get(ctx, uid)
+	if err != nil {
+		return "", ""
+	}
+	if u.Name != "" {
+		return u.Name, u.AvatarURL
+	}
+	return u.Email, u.AvatarURL
+}
+
 func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (domain.StartStoryOutput, error) {
 	if err := domain.ValidateTopic(in.Topic); err != nil {
 		return domain.StartStoryOutput{}, err
@@ -69,11 +87,14 @@ func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (do
 		return domain.StartStoryOutput{}, fmt.Errorf("app: create story: %w", err)
 	}
 
+	userName, userAvatar := s.currentUserAttribution(ctx)
 	s.notifier.Notify(ports.NotifyEvent{
-		Kind:    ports.NotifyTopicSubmitted,
-		StoryID: story.ID,
-		Title:   "New adventure started",
-		Message: in.Topic,
+		Kind:          ports.NotifyTopicSubmitted,
+		StoryID:       story.ID,
+		Title:         "New adventure started",
+		Message:       in.Topic,
+		UserName:      userName,
+		UserAvatarURL: userAvatar,
 		Fields: []ports.NotifyField{
 			{Name: "style", Value: string(style)},
 		},
@@ -120,11 +141,14 @@ func (s *Service) ProgressStory(ctx context.Context, in domain.ProgressInput) (d
 	}
 
 	chosen := cur.Choices[in.ChoiceIndex].Label
+	userName, userAvatar := s.currentUserAttribution(ctx)
 	s.notifier.Notify(ports.NotifyEvent{
-		Kind:    ports.NotifyChoiceMade,
-		StoryID: story.ID,
-		Title:   fmt.Sprintf("Choice on page %d", cur.Index+1),
-		Message: chosen,
+		Kind:          ports.NotifyChoiceMade,
+		StoryID:       story.ID,
+		Title:         fmt.Sprintf("Choice on page %d", cur.Index+1),
+		Message:       chosen,
+		UserName:      userName,
+		UserAvatarURL: userAvatar,
 		Fields: []ports.NotifyField{
 			{Name: "choiceIndex", Value: fmt.Sprintf("%d", in.ChoiceIndex)},
 		},
@@ -141,7 +165,7 @@ func (s *Service) GetStory(ctx context.Context, id string) (domain.Story, error)
 	return s.stories.Get(ctx, id)
 }
 
-func (s *Service) RecordVisit(_ context.Context, in domain.VisitInput) {
+func (s *Service) RecordVisit(ctx context.Context, in domain.VisitInput) {
 	path := in.Path
 	if path == "" {
 		path = "/"
@@ -155,11 +179,14 @@ func (s *Service) RecordVisit(_ context.Context, in domain.VisitInput) {
 	if in.UserAgent != "" {
 		fields = append(fields, ports.NotifyField{Name: "user agent", Value: truncate(in.UserAgent, 180)})
 	}
+	userName, userAvatar := s.currentUserAttribution(ctx)
 	s.notifier.Notify(ports.NotifyEvent{
-		Kind:    ports.NotifyVisitStarted,
-		Title:   "A reader arrived",
-		Message: "",
-		Fields:  fields,
+		Kind:          ports.NotifyVisitStarted,
+		Title:         "A reader arrived",
+		Message:       "",
+		UserName:      userName,
+		UserAvatarURL: userAvatar,
+		Fields:        fields,
 	})
 }
 
@@ -204,12 +231,15 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 	} else {
 		pageFields = append(pageFields, ports.NotifyField{Name: "choices", Value: fmt.Sprintf("%d", len(page.Choices))})
 	}
+	userName, userAvatar := s.currentUserAttribution(ctx)
 	s.notifier.Notify(ports.NotifyEvent{
-		Kind:    ports.NotifyPageGenerated,
-		StoryID: story.ID,
-		Title:   fmt.Sprintf("Page %d generated", seq+1),
-		Message: truncate(page.Narrative, 300),
-		Fields:  pageFields,
+		Kind:          ports.NotifyPageGenerated,
+		StoryID:       story.ID,
+		Title:         fmt.Sprintf("Page %d generated", seq+1),
+		Message:       truncate(page.Narrative, 300),
+		UserName:      userName,
+		UserAvatarURL: userAvatar,
+		Fields:        pageFields,
 	})
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -229,11 +259,13 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 		page.ImageURL = imgRes.URL
 		page.ImageProvider = imgRes.Provider
 		s.notifier.Notify(ports.NotifyEvent{
-			Kind:     ports.NotifyImageGenerated,
-			StoryID:  story.ID,
-			Title:    fmt.Sprintf("Page %d illustration", seq+1),
-			Message:  truncate(draft.ImagePrompt, 200),
-			ImageURL: page.ImageURL,
+			Kind:          ports.NotifyImageGenerated,
+			StoryID:       story.ID,
+			Title:         fmt.Sprintf("Page %d illustration", seq+1),
+			Message:       truncate(draft.ImagePrompt, 200),
+			ImageURL:      page.ImageURL,
+			UserName:      userName,
+			UserAvatarURL: userAvatar,
 			Fields: []ports.NotifyField{
 				{Name: "provider", Value: page.ImageProvider},
 			},

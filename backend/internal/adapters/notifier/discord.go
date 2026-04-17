@@ -38,12 +38,18 @@ type discordEmbedImage struct {
 	URL string `json:"url"`
 }
 
+type discordEmbedAuthor struct {
+	Name    string `json:"name"`
+	IconURL string `json:"icon_url,omitempty"`
+}
+
 type discordEmbed struct {
 	Title       string              `json:"title,omitempty"`
 	Description string              `json:"description,omitempty"`
 	Color       int                 `json:"color,omitempty"`
 	Fields      []discordEmbedField `json:"fields,omitempty"`
 	Image       *discordEmbedImage  `json:"image,omitempty"`
+	Author      *discordEmbedAuthor `json:"author,omitempty"`
 	Timestamp   string              `json:"timestamp,omitempty"`
 }
 
@@ -90,6 +96,9 @@ func (d *Discord) sendEmbed(ev ports.NotifyEvent) {
 		Description: ev.Message,
 		Color:       colorFor(ev.Kind),
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+	}
+	if ev.UserName != "" {
+		embed.Author = &discordEmbedAuthor{Name: ev.UserName, IconURL: ev.UserAvatarURL}
 	}
 	for _, f := range ev.Fields {
 		embed.Fields = append(embed.Fields, discordEmbedField{
