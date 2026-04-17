@@ -66,7 +66,7 @@ func TestFal_Generate(t *testing.T) {
 		assert.Contains(t, prompt, "no text")
 		assert.True(t, strings.Contains(prompt, ". "), "prompt parts should be joined by '. '")
 
-		assert.Equal(t, "landscape_4_3", gotBody["image_size"])
+		assert.Equal(t, "square_hd", gotBody["image_size"])
 		assert.EqualValues(t, 4, gotBody["num_inference_steps"])
 		assert.EqualValues(t, 1, gotBody["num_images"])
 		assert.Equal(t, true, gotBody["enable_safety_checker"])

@@ -62,7 +62,7 @@ func TestTogether_Generate(t *testing.T) {
 		assert.Equal(t, "black-forest-labs/FLUX.1-schnell-Free", cap.body["model"])
 		assert.Equal(t, "url", cap.body["response_format"])
 		assert.EqualValues(t, 1024, cap.body["width"])
-		assert.EqualValues(t, 768, cap.body["height"])
+		assert.EqualValues(t, 1024, cap.body["height"])
 		assert.EqualValues(t, 4, cap.body["steps"])
 		assert.EqualValues(t, 1, cap.body["n"])
 

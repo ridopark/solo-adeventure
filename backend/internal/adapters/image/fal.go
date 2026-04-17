@@ -56,7 +56,7 @@ func (f *Fal) Generate(ctx context.Context, req ports.ImageRequest) (ports.Image
 
 	payload := falRequest{
 		Prompt:              prompt,
-		ImageSize:           "landscape_4_3",
+		ImageSize:           "square_hd",
 		NumInferenceSteps:   4,
 		NumImages:           1,
 		EnableSafetyChecker: true,

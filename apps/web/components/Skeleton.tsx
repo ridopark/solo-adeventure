@@ -10,7 +10,7 @@ export function Skeleton({ variant }: { variant: "full" | "next" }) {
   }
   return (
     <div className="space-y-6">
-      <div className="aspect-[4/3] bg-stone-300 animate-pulse rounded-md" />
+      <div className="aspect-square bg-stone-300 animate-pulse rounded-md" />
       <div className="space-y-3">
         <div className="h-4 bg-stone-300 animate-pulse rounded" />
         <div className="h-4 bg-stone-300 animate-pulse rounded w-11/12" />

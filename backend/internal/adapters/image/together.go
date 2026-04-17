@@ -65,7 +65,7 @@ func (t *Together) Generate(ctx context.Context, req ports.ImageRequest) (ports.
 		Model:          t.Model,
 		Prompt:         buildTogetherPrompt(req),
 		Width:          1024,
-		Height:         768,
+		Height:         1024,
 		Steps:          4,
 		N:              1,
 		ResponseFormat: "url",

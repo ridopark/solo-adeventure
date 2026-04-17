@@ -6,13 +6,13 @@ export function Illustration({ src, alt }: { src: string | null; alt: string }) 
   const [loaded, setLoaded] = useState(false);
   if (!src) {
     return (
-      <div className="aspect-[4/3] rounded-md border border-stone-300 shadow-inner bg-stone-200 flex items-center justify-center text-xs text-stone-500">
+      <div className="aspect-square rounded-md border border-stone-300 shadow-inner bg-stone-200 flex items-center justify-center text-xs text-stone-500">
         no illustration
       </div>
     );
   }
   return (
-    <div className="aspect-[4/3] rounded-md border border-stone-300 shadow-inner bg-stone-200 overflow-hidden relative">
+    <div className="aspect-square rounded-md border border-stone-300 shadow-inner bg-stone-200 overflow-hidden relative">
       {!loaded && <div className="absolute inset-0 animate-pulse bg-stone-300" />}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

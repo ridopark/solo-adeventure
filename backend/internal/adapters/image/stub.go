@@ -22,6 +22,6 @@ func NewStub() *Stub {
 func (s *Stub) Generate(_ context.Context, req ports.ImageRequest) (ports.ImageResult, error) {
 	h := sha1.Sum([]byte(string(req.StylePrefix) + "|" + req.Prompt))
 	seed := hex.EncodeToString(h[:6])
-	url := fmt.Sprintf("%s/%s/1024/768", s.BaseURL, seed)
+	url := fmt.Sprintf("%s/%s/1024/1024", s.BaseURL, seed)
 	return ports.ImageResult{URL: url, Provider: "stub"}, nil
 }
