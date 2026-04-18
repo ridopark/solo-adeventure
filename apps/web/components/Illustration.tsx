@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-export function Illustration({ src, alt }: { src: string | null; alt: string }) {
+export function Illustration({
+  src,
+  alt,
+  seq = 0,
+}: {
+  src: string | null;
+  alt: string;
+  seq?: number;
+}) {
   const [loaded, setLoaded] = useState(false);
   if (!src) {
     return (
@@ -11,6 +19,7 @@ export function Illustration({ src, alt }: { src: string | null; alt: string }) 
       </div>
     );
   }
+  const variant = seq % 2 === 0 ? "ken-burns-a" : "ken-burns-b";
   return (
     <div className="aspect-square rounded-md border border-stone-300 shadow-inner bg-stone-200 overflow-hidden relative">
       {!loaded && <div className="absolute inset-0 animate-pulse bg-stone-300" />}
@@ -19,7 +28,7 @@ export function Illustration({ src, alt }: { src: string | null; alt: string }) 
         src={src}
         alt={alt}
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? "opacity-100" : "opacity-0"}`}
+        className={`w-full h-full object-cover transition-opacity duration-500 ${loaded ? `opacity-100 ${variant}` : "opacity-0"}`}
       />
     </div>
   );

@@ -22,3 +22,28 @@ html, body {
   background: var(--parchment);
   color: var(--near-black);
 }
+
+@keyframes ken-burns-a {
+  0%   { transform: scale(1.00) translate(-1.5%, -1%); }
+  100% { transform: scale(1.10) translate(1.5%, 1%); }
+}
+@keyframes ken-burns-b {
+  0%   { transform: scale(1.10) translate(1.5%, -1%); }
+  100% { transform: scale(1.00) translate(-1.5%, 1%); }
+}
+
+.ken-burns-a {
+  animation: ken-burns-a 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.ken-burns-b {
+  animation: ken-burns-b 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ken-burns-a,
+  .ken-burns-b {
+    animation: none;
+  }
+}
