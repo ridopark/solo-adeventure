@@ -17,7 +17,7 @@ interface State {
 }
 
 type Action =
-  | { type: "hydrate"; story: Story }
+  | { type: "hydrate"; story: Story; startAt?: number }
   | { type: "seed"; start: StartStoryResponse }
   | { type: "choose_start" }
   | { type: "choose_ok"; page: Page }
@@ -32,11 +32,16 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "hydrate": {
       const last = action.story.pages.length - 1;
+      const cursor =
+        typeof action.startAt === "number"
+          ? Math.max(0, Math.min(action.startAt, last))
+          : Math.max(0, last);
+      const page = action.story.pages[cursor];
       return {
-        status: action.story.pages.at(-1)?.isEnding ? "ended" : "page_ready",
+        status: page?.isEnding ? "ended" : "page_ready",
         pages: action.story.pages,
         stylePrefix: action.story.stylePrefix,
-        cursor: Math.max(0, last),
+        cursor,
       };
     }
     case "seed":
@@ -69,10 +74,11 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-export function useStory(storyId: string) {
+export function useStory(storyId: string, opts: { startAt?: number } = {}) {
   const router = useRouter();
   const cache = useLocalStoryCache(storyId);
   const [state, dispatch] = useReducer(reducer, initial);
+  const { startAt } = opts;
 
   useEffect(() => {
     const seedKey = `solo-adv:seed:${storyId}`;
@@ -89,11 +95,11 @@ export function useStory(storyId: string) {
     }
     const local = cache.read();
     if (local) {
-      dispatch({ type: "hydrate", story: local });
+      dispatch({ type: "hydrate", story: local, startAt });
     }
     api
       .getStory(storyId)
-      .then((story) => dispatch({ type: "hydrate", story }))
+      .then((story) => dispatch({ type: "hydrate", story, startAt }))
       .catch((err: unknown) => {
         if (!local) {
           dispatch({
@@ -102,7 +108,7 @@ export function useStory(storyId: string) {
           });
         }
       });
-  }, [storyId, cache]);
+  }, [storyId, cache, startAt]);
 
   useEffect(() => {
     if (state.pages.length > 0) {

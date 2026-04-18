@@ -164,13 +164,17 @@ export function ParallaxIllustration({
   depthSrc,
   alt,
   seq = 0,
+  paused = false,
 }: {
   imageSrc: string;
   depthSrc: string;
   alt: string;
   seq?: number;
+  paused?: boolean;
 }) {
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -267,10 +271,16 @@ export function ParallaxIllustration({
           const render = () => {
             if (disposed) return;
             const now = performance.now();
-            const t = (now - start) * 0.0006;
-            camera.position.x = Math.sin(t + phase) * 0.35;
-            camera.position.y = Math.cos(t * 1.2 + phase) * 0.2;
-            camera.lookAt(0, 0, 0);
+            if (pausedRef.current) {
+              camera.position.x = 0;
+              camera.position.y = 0;
+              camera.lookAt(0, 0, 0);
+            } else {
+              const t = (now - start) * 0.0006;
+              camera.position.x = Math.sin(t + phase) * 0.35;
+              camera.position.y = Math.cos(t * 1.2 + phase) * 0.2;
+              camera.lookAt(0, 0, 0);
+            }
             renderer!.render(scene, camera);
             frames++;
             if (now - lastSample > 3000) {

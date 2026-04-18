@@ -7,6 +7,7 @@ import { StoryView } from "@/components/StoryView";
 function StoryScreen() {
   const params = useSearchParams();
   const id = params.get("id");
+  const from = params.get("from");
   if (!id) {
     return (
       <p style={{ color: "var(--crimson)" }}>
@@ -14,7 +15,7 @@ function StoryScreen() {
       </p>
     );
   }
-  return <StoryView storyId={id} />;
+  return <StoryView storyId={id} startAt={from === "start" ? 0 : undefined} />;
 }
 
 export default function Page() {

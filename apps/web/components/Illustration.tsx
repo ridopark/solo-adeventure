@@ -6,10 +6,12 @@ export function Illustration({
   src,
   alt,
   seq = 0,
+  still = false,
 }: {
   src: string | null;
   alt: string;
   seq?: number;
+  still?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   if (!src) {
@@ -19,7 +21,7 @@ export function Illustration({
       </div>
     );
   }
-  const variant = seq % 2 === 0 ? "ken-burns-a" : "ken-burns-b";
+  const variant = still ? "" : seq % 2 === 0 ? "ken-burns-a" : "ken-burns-b";
   return (
     <div className="aspect-square rounded-md border border-stone-300 shadow-inner bg-stone-200 overflow-hidden relative">
       {!loaded && <div className="absolute inset-0 animate-pulse bg-stone-300" />}

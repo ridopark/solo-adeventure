@@ -8,10 +8,8 @@ export function ShareButton({ storyId }: { storyId: string }) {
   const [status, setStatus] = useState<Status>("idle");
 
   const handleShare = async () => {
-    const url =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/story?id=${storyId}`
-        : `/story?id=${storyId}`;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/story?id=${storyId}&from=start`;
     const shareData = {
       title: "A solo-adeventure story",
       text: "Come read this choose-your-own-adventure with me.",

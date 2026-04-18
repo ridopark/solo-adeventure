@@ -13,7 +13,7 @@ import { SignInPrompt } from "./SignInPrompt";
 import { PlayButton } from "./PlayButton";
 import { ShareButton } from "./ShareButton";
 
-export function StoryView({ storyId }: { storyId: string }) {
+export function StoryView({ storyId, startAt }: { storyId: string; startAt?: number }) {
   const {
     status,
     pages,
@@ -28,8 +28,15 @@ export function StoryView({ storyId }: { storyId: string }) {
     goNext,
     goLatest,
     restart,
-  } = useStory(storyId);
+  } = useStory(storyId, { startAt });
   const [depthUrl, setDepthUrl] = useState<string | undefined>(current?.depthUrl);
+  const [paused, setPaused] = useState(false);
+  const [showOriginal, setShowOriginal] = useState(false);
+
+  useEffect(() => {
+    setPaused(false);
+    setShowOriginal(false);
+  }, [current?.index]);
 
   useEffect(() => {
     setDepthUrl(current?.depthUrl);
@@ -59,19 +66,22 @@ export function StoryView({ storyId }: { storyId: string }) {
     return <Skeleton variant="full" />;
   }
 
+  const hasParallax = Boolean(current.imageUrl && depthUrl);
   const illustration =
-    current.imageUrl && depthUrl ? (
+    hasParallax && !showOriginal ? (
       <ParallaxIllustration
-        imageSrc={current.imageUrl}
-        depthSrc={depthUrl}
+        imageSrc={current.imageUrl!}
+        depthSrc={depthUrl!}
         alt={`Page ${current.index + 1}`}
         seq={current.index}
+        paused={paused}
       />
     ) : (
       <Illustration
         src={current.imageUrl}
         alt={`Page ${current.index + 1}`}
         seq={current.index}
+        still={showOriginal}
       />
     );
 
@@ -88,6 +98,28 @@ export function StoryView({ storyId }: { storyId: string }) {
             narrativeChars={current.narrative.length}
           />
           <ShareButton storyId={storyId} />
+          {hasParallax && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowOriginal((v) => !v)}
+                aria-pressed={showOriginal}
+                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-white hover:text-stone-900"
+              >
+                {showOriginal ? "Show 3D" : "Show original"}
+              </button>
+              {!showOriginal && (
+                <button
+                  type="button"
+                  onClick={() => setPaused((v) => !v)}
+                  aria-pressed={paused}
+                  className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-white hover:text-stone-900"
+                >
+                  {paused ? "Resume motion" : "Pause motion"}
+                </button>
+              )}
+            </>
+          )}
         </div>
         {atLatest ? (
           <>
