@@ -137,21 +137,34 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
 
   return (
     <article className="space-y-6">
-      {topic && (
-        <header className="mb-2">
-          <p className="uppercase tracking-[0.15em] text-xs" style={{ color: "var(--stone-gray)" }}>
-            An adventure about
-          </p>
-          <h1 className="font-serif text-2xl md:text-3xl tracking-tight" style={{ color: "var(--near-black)" }}>
-            {topic}
-          </h1>
-        </header>
-      )}
+      <header className="flex flex-wrap items-end justify-between gap-4 mb-2">
+        {topic ? (
+          <div>
+            <p className="uppercase tracking-[0.15em] text-xs" style={{ color: "var(--stone-gray)" }}>
+              An adventure about
+            </p>
+            <h1 className="font-serif text-2xl md:text-3xl tracking-tight" style={{ color: "var(--near-black)" }}>
+              {topic}
+            </h1>
+          </div>
+        ) : (
+          <div />
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <PlayButton
+            storyId={storyId}
+            seq={current.index}
+            initialAudioUrl={current.audioUrl}
+            narrativeChars={current.narrative.length}
+          />
+          <ShareButton storyId={storyId} />
+        </div>
+      </header>
       {pageNav}
       <div className="lg:float-left lg:w-96 lg:mr-6 lg:mb-4 space-y-3">
         {illustration}
         {hasParallax && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               onClick={() => setShowOriginal((v) => !v)}
@@ -175,15 +188,6 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
       </div>
       <NarrativeBlock text={current.narrative} />
       <div className="space-y-6 lg:clear-left">
-        <div className="flex flex-wrap items-center gap-2">
-          <PlayButton
-            storyId={storyId}
-            seq={current.index}
-            initialAudioUrl={current.audioUrl}
-            narrativeChars={current.narrative.length}
-          />
-          <ShareButton storyId={storyId} />
-        </div>
         {atLatest ? (
           <>
             {status === "choosing" && <Skeleton variant="next" />}
