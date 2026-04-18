@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { StoryView } from "@/components/StoryView";
+import { SiteHeader } from "@/components/SiteHeader";
 
 function StoryScreen() {
   const params = useSearchParams();
@@ -20,10 +21,13 @@ function StoryScreen() {
 
 export default function Page() {
   return (
-    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-10">
-      <Suspense fallback={<p style={{ color: "var(--stone-gray)" }}>Loading...</p>}>
-        <StoryScreen />
-      </Suspense>
-    </main>
+    <div>
+      <SiteHeader />
+      <main className="mx-auto max-w-2xl lg:max-w-4xl px-6 py-10">
+        <Suspense fallback={<p style={{ color: "var(--stone-gray)" }}>Loading...</p>}>
+          <StoryScreen />
+        </Suspense>
+      </main>
+    </div>
   );
 }

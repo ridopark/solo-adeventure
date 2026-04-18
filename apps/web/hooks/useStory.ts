@@ -12,6 +12,7 @@ interface State {
   status: Status;
   pages: Page[];
   stylePrefix: string;
+  topic: string;
   cursor: number;
   error?: string;
 }
@@ -26,7 +27,7 @@ type Action =
   | { type: "goto"; cursor: number }
   | { type: "reset" };
 
-const initial: State = { status: "hydrating", pages: [], stylePrefix: "", cursor: 0 };
+const initial: State = { status: "hydrating", pages: [], stylePrefix: "", topic: "", cursor: 0 };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -41,6 +42,7 @@ function reducer(state: State, action: Action): State {
         status: page?.isEnding ? "ended" : "page_ready",
         pages: action.story.pages,
         stylePrefix: action.story.stylePrefix,
+        topic: action.story.topic ?? state.topic,
         cursor,
       };
     }
@@ -49,6 +51,7 @@ function reducer(state: State, action: Action): State {
         status: action.start.page.isEnding ? "ended" : "page_ready",
         pages: [action.start.page],
         stylePrefix: action.start.stylePrefix,
+        topic: state.topic,
         cursor: 0,
       };
     case "choose_start":
@@ -59,6 +62,7 @@ function reducer(state: State, action: Action): State {
         status: action.page.isEnding ? "ended" : "page_ready",
         pages,
         stylePrefix: state.stylePrefix,
+        topic: state.topic,
         cursor: pages.length - 1,
       };
     }
@@ -114,14 +118,14 @@ export function useStory(storyId: string, opts: { startAt?: number } = {}) {
     if (state.pages.length > 0) {
       cache.write({
         storyId,
-        topic: "",
+        topic: state.topic,
         stylePrefix: state.stylePrefix,
         pages: state.pages,
         createdAt: "",
         updatedAt: "",
       });
     }
-  }, [state.pages, state.stylePrefix, storyId, cache]);
+  }, [state.pages, state.stylePrefix, state.topic, storyId, cache]);
 
   const choose = useCallback(
     async (index: number) => {
@@ -168,6 +172,7 @@ export function useStory(storyId: string, opts: { startAt?: number } = {}) {
     pages: state.pages,
     current: state.pages[state.cursor] ?? null,
     cursor: state.cursor,
+    topic: state.topic,
     atLatest,
     canGoPrev: state.cursor > 0,
     canGoNext: state.cursor < state.pages.length - 1,

@@ -19,6 +19,7 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
     pages,
     current,
     cursor,
+    topic,
     atLatest,
     canGoPrev,
     canGoNext,
@@ -135,8 +136,19 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
   );
 
   return (
-    <article className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
-      <div className="space-y-3 lg:sticky lg:top-8">
+    <article className="space-y-6">
+      {topic && (
+        <header className="mb-2">
+          <p className="uppercase tracking-[0.15em] text-xs" style={{ color: "var(--stone-gray)" }}>
+            An adventure about
+          </p>
+          <h1 className="font-serif text-2xl md:text-3xl tracking-tight" style={{ color: "var(--near-black)" }}>
+            {topic}
+          </h1>
+        </header>
+      )}
+      {pageNav}
+      <div className="lg:float-left lg:w-96 lg:mr-6 lg:mb-4 space-y-3">
         {illustration}
         {hasParallax && (
           <div className="flex flex-wrap items-center gap-2">
@@ -161,9 +173,8 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
           </div>
         )}
       </div>
-      <div className="space-y-6">
-        {pageNav}
-        <NarrativeBlock text={current.narrative} />
+      <NarrativeBlock text={current.narrative} />
+      <div className="space-y-6 lg:clear-left">
         <div className="flex flex-wrap items-center gap-2">
           <PlayButton
             storyId={storyId}
