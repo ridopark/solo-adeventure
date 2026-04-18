@@ -243,11 +243,11 @@ export function ParallaxIllustration({
             `[parallax] depth stats ${depthAnalysis.width}x${depthAnalysis.height} range=${depthAnalysis.range} avgGrad=${depthAnalysis.avgGradient.toFixed(3)} edgeRatio=${depthAnalysis.edgeRatio.toFixed(3)} -> displacement=${dispScale.toFixed(2)}`,
           );
 
-          // Plane is deliberately oversized (3x3 vs ~2 unit viewport at z=2.2)
-          // so the container's stone-200 background never peeks through when
-          // the camera pans to extremes. overflow-hidden on the parent clips
-          // anything beyond the frame.
-          const geometry = new THREE.PlaneGeometry(3, 3, 200, 200);
+          // Plane slightly oversized (2.3 vs ~2.05-unit viewport at z=2.2) so
+          // the container's stone-200 background never peeks through at max
+          // camera pan, without cropping too much of the image. overflow-hidden
+          // on the parent clips anything beyond the frame.
+          const geometry = new THREE.PlaneGeometry(2.3, 2.3, 200, 200);
           const tw = depthAnalysis.width;
           const th = depthAnalysis.height;
           const material = new THREE.ShaderMaterial({
@@ -267,7 +267,7 @@ export function ParallaxIllustration({
           const start = performance.now();
           let frames = 0;
           let lastSample = start;
-          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 plane=3 edgeFade=on texel=${(1 / tw).toFixed(5)}`);
+          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 plane=2.3 edgeFade=on texel=${(1 / tw).toFixed(5)}`);
           const render = () => {
             if (disposed) return;
             const now = performance.now();
@@ -277,8 +277,8 @@ export function ParallaxIllustration({
               camera.lookAt(0, 0, 0);
             } else {
               const t = (now - start) * 0.0006;
-              camera.position.x = Math.sin(t + phase) * 0.35;
-              camera.position.y = Math.cos(t * 1.2 + phase) * 0.2;
+              camera.position.x = Math.sin(t + phase) * 0.1;
+              camera.position.y = Math.cos(t * 1.2 + phase) * 0.06;
               camera.lookAt(0, 0, 0);
             }
             renderer!.render(scene, camera);
