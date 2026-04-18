@@ -9,6 +9,12 @@
             "prompt": "Review the staged changes (run `git diff --staged`) for code quality, reuse opportunities, and efficiency issues. Apply minimal fixes if needed. Do NOT change test files or config files. Only fix issues in application code. Be concise -- skip if changes look clean.",
             "timeout": 120,
             "statusMessage": "Running /simplify on staged changes..."
+          },
+          {
+            "type": "agent",
+            "prompt": "Invoke the /review skill to review the staged changes (run `git diff --staged`) for correctness bugs, security issues, and style deviations. If /review is PR-focused and no PR exists for this branch, adapt and run the review directly on the staged diff. Report findings as a concise bulleted list with file:line references. Do NOT auto-apply fixes -- the /simplify hook handles that. Skip if changes look clean.",
+            "timeout": 180,
+            "statusMessage": "Running /review on staged changes..."
           }
         ]
       }
