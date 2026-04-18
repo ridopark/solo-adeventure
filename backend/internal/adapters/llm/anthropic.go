@@ -53,13 +53,20 @@ const systemPromptNextPage = `You are the author of a choose-your-own-adventure 
 - imagePrompt describes the scene visually: environment, composition, mood, subjects, palette.
 - Never include text, lettering, signs, dialogue bubbles, or captions -- they render as garbled pixels.
 - Never describe nudity, minors in unsafe contexts, or graphic gore. The image generator will reject these prompts.
+- Compose for depth: establish clear foreground, midground, and background layers. Favor over-the-shoulder or third-person-perspective framing, receding environments with atmospheric haze, a prominent foreground subject against a visibly deeper background.
 - Prefer medium or wide shots; suggest an atmospheric palette that matches the story.
+- AVOID depth-flattening compositions: extreme close-ups on a single face, flat patterns or textures filling the frame, busy uniform detail with no clear subject, dense fur/feather/hair silhouettes, mist or smoke filling the scene, abstract symmetrical backgrounds.
 
 ## Output
 - Always invoke the emit_page tool. Never respond as plain text.
 - runningSummary is 2-3 sentences capturing the WHOLE story so far, including the reader's current situation. It is the only memory the next page will have.`
 
-const systemPromptStyle = "You produce short illustrator style descriptors (8-15 words) for storybook art. Output ONLY the descriptor; no preamble, no quotes."
+const systemPromptStyle = "You produce short illustrator style descriptors (8-15 words) for storybook art. Favor cinematic, depth-rich, atmospheric styles that suit layered foreground/background composition. Output ONLY the descriptor; no preamble, no quotes."
+
+// Appended to every image prompt so that even when the LLM's scene
+// description drifts, FLUX still has composition cues that make the output
+// play well with monocular depth estimation and 2.5D parallax.
+const imagePromptDepthSuffix = ". Cinematic composition with clear foreground, midground, and background layers; atmospheric perspective; volumetric lighting; deep receding environment"
 
 var emitPageInputSchema = json.RawMessage(`{
   "type": "object",
@@ -278,7 +285,7 @@ func parseToolUse(resp *anthropicResponse) (domain.PageDraft, error) {
 		}
 		return domain.PageDraft{
 			Narrative:      input.Narrative,
-			ImagePrompt:    input.ImagePrompt,
+			ImagePrompt:    appendDepthSuffix(input.ImagePrompt),
 			Choices:        input.Choices,
 			IsEnding:       input.IsEnding,
 			EndingType:     domain.EndingType(input.EndingType),
@@ -286,6 +293,18 @@ func parseToolUse(resp *anthropicResponse) (domain.PageDraft, error) {
 		}, nil
 	}
 	return domain.PageDraft{}, errors.New("no tool_use block in response")
+}
+
+func appendDepthSuffix(prompt string) string {
+	p := strings.TrimSpace(prompt)
+	if p == "" {
+		return p
+	}
+	if strings.Contains(strings.ToLower(p), "foreground, midground") {
+		return p
+	}
+	p = strings.TrimRight(p, ".")
+	return p + imagePromptDepthSuffix
 }
 
 func validateDraft(d domain.PageDraft, seq int) error {

@@ -90,7 +90,8 @@ func TestNextPage_HappyPath_FirstPage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "You stand at the edge of a cliff as the wind roars in your ears.", draft.Narrative)
-	assert.Equal(t, "A lone traveler at a cliff edge under stormy skies.", draft.ImagePrompt)
+	assert.Contains(t, draft.ImagePrompt, "A lone traveler at a cliff edge under stormy skies")
+	assert.Contains(t, draft.ImagePrompt, "foreground, midground, and background")
 	assert.Len(t, draft.Choices, 2)
 	assert.Equal(t, "Leap", draft.Choices[0].Label)
 	assert.False(t, draft.IsEnding)
