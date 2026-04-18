@@ -136,7 +136,31 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
 
   return (
     <article className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
-      <div className="lg:sticky lg:top-8">{illustration}</div>
+      <div className="space-y-3 lg:sticky lg:top-8">
+        {illustration}
+        {hasParallax && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowOriginal((v) => !v)}
+              aria-pressed={showOriginal}
+              className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-white hover:text-stone-900"
+            >
+              {showOriginal ? "Show 3D" : "Show original"}
+            </button>
+            {!showOriginal && (
+              <button
+                type="button"
+                onClick={() => setPaused((v) => !v)}
+                aria-pressed={paused}
+                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-white hover:text-stone-900"
+              >
+                {paused ? "Resume motion" : "Pause motion"}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       <div className="space-y-6">
         {pageNav}
         <NarrativeBlock text={current.narrative} />
@@ -148,28 +172,6 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
             narrativeChars={current.narrative.length}
           />
           <ShareButton storyId={storyId} />
-          {hasParallax && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowOriginal((v) => !v)}
-                aria-pressed={showOriginal}
-                className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-white hover:text-stone-900"
-              >
-                {showOriginal ? "Show 3D" : "Show original"}
-              </button>
-              {!showOriginal && (
-                <button
-                  type="button"
-                  onClick={() => setPaused((v) => !v)}
-                  aria-pressed={paused}
-                  className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white/70 px-3 py-1.5 text-sm text-stone-700 transition hover:bg-white hover:text-stone-900"
-                >
-                  {paused ? "Resume motion" : "Pause motion"}
-                </button>
-              )}
-            </>
-          )}
         </div>
         {atLatest ? (
           <>
