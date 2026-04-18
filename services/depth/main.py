@@ -40,7 +40,14 @@ def health():
 @app.post("/depth")
 def depth(req: DepthRequest):
     try:
-        with urllib.request.urlopen(req.image_url, timeout=15) as r:
+        fetch = urllib.request.Request(
+            req.image_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; solo-adeventure-depth/1.0)",
+                "Accept": "image/*",
+            },
+        )
+        with urllib.request.urlopen(fetch, timeout=15) as r:
             raw = r.read()
         orig = Image.open(io.BytesIO(raw)).convert("RGB")
     except Exception as e:
