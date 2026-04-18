@@ -27,6 +27,7 @@ type RouterConfig struct {
 	CookieDomain string
 	Secure       bool
 	AudioDir     string
+	DepthDir     string
 }
 
 func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Handler {
@@ -45,6 +46,7 @@ func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Hand
 	mux.HandleFunc("POST /stories/{id}/choose", r.chooseStory)
 	mux.HandleFunc("POST /stories/{id}/claim", r.claimStory)
 	mux.HandleFunc("POST /stories/{id}/pages/{seq}/speech", r.generateSpeech)
+	mux.HandleFunc("POST /stories/{id}/pages/{seq}/depth", r.generateDepth)
 	mux.HandleFunc("GET /stories", r.myStories)
 	mux.HandleFunc("POST /images", r.generateImage)
 	mux.HandleFunc("POST /visit", r.visit)
@@ -55,6 +57,9 @@ func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Hand
 
 	if cfg.AudioDir != "" {
 		mux.Handle("GET /audio/", http.StripPrefix("/audio/", http.FileServer(http.Dir(cfg.AudioDir))))
+	}
+	if cfg.DepthDir != "" {
+		mux.Handle("GET /depth/", http.StripPrefix("/depth/", http.FileServer(http.Dir(cfg.DepthDir))))
 	}
 
 	var h http.Handler = mux
@@ -214,6 +219,30 @@ func (r *Router) generateSpeech(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"audioUrl": url})
+}
+
+func (r *Router) generateDepth(w http.ResponseWriter, req *http.Request) {
+	id := req.PathValue("id")
+	seqStr := req.PathValue("seq")
+	seq, err := strconv.Atoi(seqStr)
+	if err != nil || seq < 0 {
+		writeError(w, http.StatusBadRequest, "invalid page index")
+		return
+	}
+	url, err := r.svc.GenerateDepth(req.Context(), id, seq)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrStoryNotFound), errors.Is(err, domain.ErrPageNotFound):
+			writeError(w, http.StatusNotFound, "page not found")
+		case errors.Is(err, domain.ErrDepthUnavailable):
+			writeError(w, http.StatusServiceUnavailable, "depth unavailable")
+		default:
+			r.log.Error().Err(err).Msg("generate depth")
+			writeError(w, http.StatusBadGateway, "depth failed")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"depthUrl": url})
 }
 
 func (r *Router) visit(w http.ResponseWriter, req *http.Request) {

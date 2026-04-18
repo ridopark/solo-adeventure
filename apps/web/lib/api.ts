@@ -42,6 +42,10 @@ export const api = {
     request<{ audioUrl: string }>(`/stories/${storyId}/pages/${seq}/speech`, {
       method: "POST",
     }),
+  depth: (storyId: string, seq: number) =>
+    request<{ depthUrl: string }>(`/stories/${storyId}/pages/${seq}/depth`, {
+      method: "POST",
+    }),
   visit: (path: string) =>
     request<{ status: string }>("/visit", {
       method: "POST",

@@ -89,7 +89,7 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
-            sudo mkdir -p /opt/solo-adeventure/tts /opt/solo-adeventure/audio /opt/solo-adeventure/staging
+            sudo mkdir -p /opt/solo-adeventure/tts /opt/solo-adeventure/audio /opt/solo-adeventure/depth /opt/solo-adeventure/depth/hf-cache /opt/solo-adeventure/staging
             sudo chown -R ubuntu:ubuntu /opt/solo-adeventure
 
       - name: Copy binary to OCI
@@ -109,6 +109,15 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           source: services/tts/main.py,services/tts/requirements.txt,deployments/systemd/solo-adeventure-tts.service
+          target: /opt/solo-adeventure/staging/
+
+      - name: Copy depth sidecar to OCI
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          source: services/depth/main.py,services/depth/requirements.txt,deployments/systemd/solo-adeventure-depth.service
           target: /opt/solo-adeventure/staging/
 
       - name: Install/restart service
@@ -152,7 +161,13 @@ jobs:
             TTS_VOICE=en-US-AndrewNeural
             AUDIO_DIR=/opt/solo-adeventure/audio
             AUDIO_URL_BASE=/audio/
+            DEPTH_ENABLED=true
+            DEPTH_URL=http://127.0.0.1:8086
+            DEPTH_DIR=/opt/solo-adeventure/depth/cache
+            DEPTH_URL_BASE=/depth/
+            PUBLIC_BASE_URL=https://solo-adeventure-api.ridopark.com
             ENVEOF
+            mkdir -p /opt/solo-adeventure/depth/cache
 
             # Install python3 + venv toolchain if missing (idempotent)
             if ! command -v python3 >/dev/null 2>&1 || ! dpkg -s python3-venv >/dev/null 2>&1; then
@@ -178,6 +193,31 @@ jobs:
             sudo systemctl restart solo-adeventure-tts
             sleep 3
             curl -sf http://127.0.0.1:8085/health && echo " tts up"
+
+            # Stage depth sidecar files into place
+            mv /opt/solo-adeventure/staging/services/depth/main.py /opt/solo-adeventure/depth/main.py
+            mv /opt/solo-adeventure/staging/services/depth/requirements.txt /opt/solo-adeventure/depth/requirements.txt
+            sudo mv /opt/solo-adeventure/staging/deployments/systemd/solo-adeventure-depth.service /etc/systemd/system/solo-adeventure-depth.service
+            rm -rf /opt/solo-adeventure/staging
+
+            # Create or reuse depth venv, install/upgrade deps
+            if [ ! -d /opt/solo-adeventure/depth/venv ]; then
+              python3 -m venv /opt/solo-adeventure/depth/venv
+            fi
+            /opt/solo-adeventure/depth/venv/bin/pip install --quiet --upgrade pip
+            /opt/solo-adeventure/depth/venv/bin/pip install --quiet -r /opt/solo-adeventure/depth/requirements.txt
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable solo-adeventure-depth
+            sudo systemctl restart solo-adeventure-depth
+            # First boot downloads ~100MB ONNX model from HuggingFace; be patient.
+            for i in $(seq 1 60); do
+              if curl -sf http://127.0.0.1:8086/health >/dev/null; then
+                echo " depth up"
+                break
+              fi
+              sleep 2
+            done
 
             if [ ! -f /etc/systemd/system/solo-adeventure-server.service ]; then
               sudo tee /etc/systemd/system/solo-adeventure-server.service << 'SVCEOF'

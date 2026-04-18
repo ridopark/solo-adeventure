@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,10 @@ type Service struct {
 	tts        ports.TTSProvider
 	audioDir   string
 	audioBase  string
+	depth      ports.DepthProvider
+	depthDir   string
+	depthBase  string
+	publicBase string
 	log        zerolog.Logger
 	now        func() time.Time
 	newID      func() string
@@ -60,6 +65,17 @@ func (s *Service) WithTTS(tts ports.TTSProvider, audioDir, audioBase string) *Se
 	s.tts = tts
 	s.audioDir = audioDir
 	s.audioBase = audioBase
+	return s
+}
+
+// WithDepth wires the optional depth-map sidecar for parallax rendering.
+// publicBase is the externally-reachable URL root the depth sidecar will use
+// to fetch page images (e.g. https://solo-adeventure-api.ridopark.com).
+func (s *Service) WithDepth(depth ports.DepthProvider, depthDir, depthBase, publicBase string) *Service {
+	s.depth = depth
+	s.depthDir = depthDir
+	s.depthBase = depthBase
+	s.publicBase = publicBase
 	return s
 }
 
@@ -294,6 +310,55 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 		return domain.Page{}, fmt.Errorf("app: append page: %w", err)
 	}
 	return page, nil
+}
+
+// GenerateDepth returns a cached depth-map URL for a page illustration,
+// running MiDaS inference via the depth sidecar on first call. The image
+// never mutates after generation, so first call pays the CPU cost and the
+// rest are free disk reads (identical cache shape to GenerateSpeech).
+func (s *Service) GenerateDepth(ctx context.Context, storyID string, seq int) (string, error) {
+	if s.depth == nil || s.depthDir == "" {
+		return "", domain.ErrDepthUnavailable
+	}
+	story, err := s.stories.Get(ctx, storyID)
+	if err != nil {
+		return "", err
+	}
+	if seq < 0 || seq >= len(story.Pages) {
+		return "", domain.ErrPageNotFound
+	}
+	page := story.Pages[seq]
+	if page.DepthURL != "" {
+		return page.DepthURL, nil
+	}
+	if page.ImageURL == "" {
+		return "", domain.ErrDepthUnavailable
+	}
+
+	imageURL := page.ImageURL
+	if strings.HasPrefix(imageURL, "/") && s.publicBase != "" {
+		imageURL = s.publicBase + imageURL
+	}
+
+	res, err := s.depth.Estimate(ctx, ports.DepthRequest{ImageURL: imageURL})
+	if err != nil {
+		s.log.Warn().Err(err).Str("story_id", storyID).Int("seq", seq).Msg("depth estimation failed")
+		return "", domain.ErrDepthUnavailable
+	}
+
+	filename := fmt.Sprintf("%s-%d.png", storyID, seq)
+	if err := os.MkdirAll(s.depthDir, 0o755); err != nil {
+		return "", fmt.Errorf("app: depth dir: %w", err)
+	}
+	path := filepath.Join(s.depthDir, filename)
+	if err := os.WriteFile(path, res.PNG, 0o644); err != nil {
+		return "", fmt.Errorf("app: write depth: %w", err)
+	}
+	url := s.depthBase + filename
+	if err := s.stories.UpdatePageDepth(ctx, storyID, seq, url); err != nil {
+		return "", fmt.Errorf("app: persist depth url: %w", err)
+	}
+	return url, nil
 }
 
 // GenerateSpeech returns a cached audio URL for a page narrative, synthesizing

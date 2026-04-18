@@ -33,6 +33,11 @@ type Config struct {
 	TTSVoice            string
 	AudioDir            string
 	AudioURLBase        string
+	DepthEnabled        bool
+	DepthURL            string
+	DepthDir            string
+	DepthURLBase        string
+	PublicBaseURL       string
 }
 
 func Load() Config {
@@ -63,6 +68,11 @@ func Load() Config {
 		TTSVoice:            getenv("TTS_VOICE", "en-US-AndrewNeural"),
 		AudioDir:            getenv("AUDIO_DIR", "./audio"),
 		AudioURLBase:        getenv("AUDIO_URL_BASE", "/audio/"),
+		DepthEnabled:        getenv("DEPTH_ENABLED", "true") == "true",
+		DepthURL:            getenv("DEPTH_URL", "http://127.0.0.1:8086"),
+		DepthDir:            getenv("DEPTH_DIR", "./depth"),
+		DepthURLBase:        getenv("DEPTH_URL_BASE", "/depth/"),
+		PublicBaseURL:       getenv("PUBLIC_BASE_URL", ""),
 	}
 }
 

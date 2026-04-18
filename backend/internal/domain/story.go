@@ -23,6 +23,7 @@ type Page struct {
 	ImageURL       string     `json:"imageUrl,omitempty"`
 	ImageProvider  string     `json:"imageProvider,omitempty"`
 	AudioURL       string     `json:"audioUrl,omitempty"`
+	DepthURL       string     `json:"depthUrl,omitempty"`
 	Choices        []Choice   `json:"choices"`
 	IsEnding       bool       `json:"isEnding"`
 	EndingType     EndingType `json:"endingType,omitempty"`

@@ -10,6 +10,7 @@ export interface Page {
   imageUrl: string | null;
   imageProvider?: string;
   audioUrl?: string;
+  depthUrl?: string;
   choices: Choice[];
   isEnding: boolean;
   endingType?: EndingType;

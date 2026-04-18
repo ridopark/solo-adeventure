@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/auth"
+	"github.com/ridopark/solo-adeventure/backend/internal/adapters/depth"
 	httpadapter "github.com/ridopark/solo-adeventure/backend/internal/adapters/http"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/image"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/llm"
@@ -48,12 +49,20 @@ func main() {
 		log.Info().Msg("TTS_ENABLED=false; narration disabled")
 	}
 
+	if cfg.DepthEnabled {
+		svc = svc.WithDepth(depth.NewLocal(cfg.DepthURL, log), cfg.DepthDir, cfg.DepthURLBase, cfg.PublicBaseURL)
+		log.Info().Str("depth_url", cfg.DepthURL).Msg("depth sidecar wired")
+	} else {
+		log.Info().Msg("DEPTH_ENABLED=false; parallax disabled")
+	}
+
 	handler := httpadapter.NewRouter(svc, log, httpadapter.RouterConfig{
 		CORSOrigin:   cfg.CORSAllowOrigin,
 		FrontendURL:  cfg.FrontendURL,
 		CookieDomain: cfg.CookieDomain,
 		Secure:       cfg.CookieSecure,
 		AudioDir:     cfg.AudioDir,
+		DepthDir:     cfg.DepthDir,
 	})
 
 	server := &http.Server{

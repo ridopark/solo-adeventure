@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS pages (
 	image_url TEXT,
 	image_provider TEXT,
 	audio_url TEXT,
+	depth_url TEXT,
 	choices TEXT NOT NULL,
 	is_ending INTEGER NOT NULL DEFAULT 0,
 	ending_type TEXT,
@@ -79,6 +80,9 @@ func NewSQLite(path string) (*SQLite, error) {
 	}
 	if _, err := db.Exec(`ALTER TABLE pages ADD COLUMN audio_url TEXT`); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
 		return nil, fmt.Errorf("sqlite: migrate audio_url: %w", err)
+	}
+	if _, err := db.Exec(`ALTER TABLE pages ADD COLUMN depth_url TEXT`); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return nil, fmt.Errorf("sqlite: migrate depth_url: %w", err)
 	}
 	return &SQLite{db: db}, nil
 }
@@ -120,7 +124,7 @@ func (s *SQLite) Get(ctx context.Context, id string) (domain.Story, error) {
 
 func (s *SQLite) loadPages(ctx context.Context, storyID string) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT idx, narrative, COALESCE(image_prompt,''), COALESCE(image_url,''), COALESCE(image_provider,''), COALESCE(audio_url,''), choices, is_ending, COALESCE(ending_type,''), COALESCE(running_summary,''), created_at
+		`SELECT idx, narrative, COALESCE(image_prompt,''), COALESCE(image_url,''), COALESCE(image_provider,''), COALESCE(audio_url,''), COALESCE(depth_url,''), choices, is_ending, COALESCE(ending_type,''), COALESCE(running_summary,''), created_at
 		 FROM pages WHERE story_id = ? ORDER BY idx ASC`, storyID)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: pages load: %w", err)
@@ -131,7 +135,7 @@ func (s *SQLite) loadPages(ctx context.Context, storyID string) ([]domain.Page, 
 		var p domain.Page
 		var choicesJSON, endingType string
 		var isEndingI int
-		if err := rows.Scan(&p.Index, &p.Narrative, &p.ImagePrompt, &p.ImageURL, &p.ImageProvider, &p.AudioURL, &choicesJSON, &isEndingI, &endingType, &p.RunningSummary, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.Index, &p.Narrative, &p.ImagePrompt, &p.ImageURL, &p.ImageProvider, &p.AudioURL, &p.DepthURL, &choicesJSON, &isEndingI, &endingType, &p.RunningSummary, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("sqlite: pages scan: %w", err)
 		}
 		p.IsEnding = isEndingI != 0
@@ -210,6 +214,20 @@ func (s *SQLite) UpdatePageAudio(ctx context.Context, storyID string, idx int, a
 		audioURL, storyID, idx)
 	if err != nil {
 		return fmt.Errorf("sqlite: update audio: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return domain.ErrStoryNotFound
+	}
+	return nil
+}
+
+func (s *SQLite) UpdatePageDepth(ctx context.Context, storyID string, idx int, depthURL string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE pages SET depth_url = ? WHERE story_id = ? AND idx = ?`,
+		depthURL, storyID, idx)
+	if err != nil {
+		return fmt.Errorf("sqlite: update depth: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {

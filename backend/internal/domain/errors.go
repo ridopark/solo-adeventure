@@ -10,5 +10,6 @@ var (
 	ErrForbidden      = errors.New("not the story owner")
 	ErrSessionInvalid = errors.New("session invalid or expired")
 	ErrPageNotFound   = errors.New("page not found")
-	ErrTTSUnavailable = errors.New("tts unavailable")
+	ErrTTSUnavailable   = errors.New("tts unavailable")
+	ErrDepthUnavailable = errors.New("depth unavailable")
 )

@@ -42,6 +42,7 @@ type StoryStore interface {
 	ListByUser(ctx context.Context, userID string, limit int) ([]domain.Story, error)
 	AttachUser(ctx context.Context, storyID, userID string) error
 	UpdatePageAudio(ctx context.Context, storyID string, idx int, audioURL string) error
+	UpdatePageDepth(ctx context.Context, storyID string, idx int, depthURL string) error
 }
 
 type TTSRequest struct {
@@ -56,6 +57,18 @@ type TTSResult struct {
 
 type TTSProvider interface {
 	Synthesize(ctx context.Context, req TTSRequest) (TTSResult, error)
+}
+
+type DepthRequest struct {
+	ImageURL string
+}
+
+type DepthResult struct {
+	PNG []byte
+}
+
+type DepthProvider interface {
+	Estimate(ctx context.Context, req DepthRequest) (DepthResult, error)
 }
 
 type UserStore interface {

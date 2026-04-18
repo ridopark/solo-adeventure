@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useStory } from "@/hooks/useStory";
+import { api } from "@/lib/api";
 import { NarrativeBlock } from "./NarrativeBlock";
 import { Illustration } from "./Illustration";
+import { ParallaxIllustration } from "./ParallaxIllustration";
 import { ChoiceButtons } from "./ChoiceButtons";
 import { EndingCard } from "./EndingCard";
 import { Skeleton } from "./Skeleton";
@@ -11,6 +14,24 @@ import { PlayButton } from "./PlayButton";
 
 export function StoryView({ storyId }: { storyId: string }) {
   const { status, pages, current, error, choose, restart } = useStory(storyId);
+  const [depthUrl, setDepthUrl] = useState<string | undefined>(current?.depthUrl);
+
+  useEffect(() => {
+    setDepthUrl(current?.depthUrl);
+    if (!current || current.depthUrl || !current.imageUrl) return;
+    let cancelled = false;
+    api
+      .depth(storyId, current.index)
+      .then((res) => {
+        if (!cancelled) setDepthUrl(res.depthUrl);
+      })
+      .catch(() => {
+        /* fallback to still image */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyId, current?.index, current?.imageUrl, current?.depthUrl]);
 
   if (status === "hydrating" || !current) {
     return <Skeleton variant="full" />;
@@ -18,7 +39,20 @@ export function StoryView({ storyId }: { storyId: string }) {
 
   return (
     <article className="space-y-6">
-      <Illustration src={current.imageUrl} alt={`Page ${current.index + 1}`} seq={current.index} />
+      {current.imageUrl && depthUrl ? (
+        <ParallaxIllustration
+          imageSrc={current.imageUrl}
+          depthSrc={depthUrl}
+          alt={`Page ${current.index + 1}`}
+          seq={current.index}
+        />
+      ) : (
+        <Illustration
+          src={current.imageUrl}
+          alt={`Page ${current.index + 1}`}
+          seq={current.index}
+        />
+      )}
       <NarrativeBlock text={current.narrative} />
       <PlayButton
         storyId={storyId}
