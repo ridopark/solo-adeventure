@@ -3,7 +3,9 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -47,6 +49,7 @@ func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Hand
 	mux.HandleFunc("POST /stories/{id}/claim", r.claimStory)
 	mux.HandleFunc("POST /stories/{id}/pages/{seq}/speech", r.generateSpeech)
 	mux.HandleFunc("POST /stories/{id}/pages/{seq}/depth", r.generateDepth)
+	mux.HandleFunc("GET /img", r.imageProxy)
 	mux.HandleFunc("GET /stories", r.myStories)
 	mux.HandleFunc("POST /images", r.generateImage)
 	mux.HandleFunc("POST /visit", r.visit)
@@ -243,6 +246,62 @@ func (r *Router) generateDepth(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"depthUrl": url})
+}
+
+// Origins we'll proxy. Image CDNs typically don't send CORS headers, so WebGL
+// texture loading (which requires crossOrigin=anonymous) fails without a
+// same-origin pass-through.
+var allowedImgHosts = map[string]bool{
+	"api.together.ai":    true,
+	"api.together.xyz":   true,
+	"together.ai":        true,
+	"fal.media":          true,
+	"v3.fal.media":       true,
+	"v2.fal.media":       true,
+	"storage.googleapis.com": true,
+}
+
+var imgProxyClient = &http.Client{Timeout: 30 * time.Second}
+
+func (r *Router) imageProxy(w http.ResponseWriter, req *http.Request) {
+	raw := req.URL.Query().Get("url")
+	if raw == "" {
+		writeError(w, http.StatusBadRequest, "url required")
+		return
+	}
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		writeError(w, http.StatusBadRequest, "invalid url")
+		return
+	}
+	if !allowedImgHosts[u.Host] {
+		writeError(w, http.StatusForbidden, "host not allowed")
+		return
+	}
+	proxyReq, err := http.NewRequestWithContext(req.Context(), http.MethodGet, raw, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "build request failed")
+		return
+	}
+	proxyReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; solo-adeventure/1.0)")
+	proxyReq.Header.Set("Accept", "image/*")
+	resp, err := imgProxyClient.Do(proxyReq)
+	if err != nil {
+		r.log.Warn().Err(err).Str("url", raw).Msg("img proxy fetch failed")
+		writeError(w, http.StatusBadGateway, "fetch failed")
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		writeError(w, http.StatusBadGateway, "upstream non-2xx")
+		return
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	}
+	w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, resp.Body)
 }
 
 func (r *Router) visit(w http.ResponseWriter, req *http.Request) {

@@ -8,6 +8,14 @@ function resolveURL(url: string) {
   return url.startsWith("http") ? url : `${BACKEND_URL}${url}`;
 }
 
+// Cross-origin image URLs can't be used as WebGL textures without CORS, so
+// route them through the backend proxy which returns the same bytes with
+// same-origin permissions.
+function proxyImage(url: string) {
+  if (!url.startsWith("http")) return `${BACKEND_URL}${url}`;
+  return `${BACKEND_URL}/img?url=${encodeURIComponent(url)}`;
+}
+
 async function inspectDepth(url: string): Promise<void> {
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -128,7 +136,7 @@ export function ParallaxIllustration({
         });
 
       Promise.all([
-        loadTexture(resolveURL(imageSrc), "color"),
+        loadTexture(proxyImage(imageSrc), "color"),
         loadTexture(resolveURL(depthSrc), "depth"),
       ])
         .then(([colorTex, depthTex]) => {
