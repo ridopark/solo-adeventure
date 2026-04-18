@@ -39,7 +39,7 @@ export default function LandingPage() {
         <div className="text-center mb-14">
           <p className="uppercase tracking-[0.15em] text-xs text-[var(--stone-gray)] mb-4">How it works</p>
           <h2 className="font-serif text-3xl md:text-4xl leading-[1.20] tracking-tight text-[var(--near-black)]">
-            Three beats, a finished tale.
+            Read it. Hear it. See it breathe.
           </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -51,13 +51,18 @@ export default function LandingPage() {
             },
             {
               step: "02",
-              title: "Read the page",
-              body: "Claude writes 150-250 words of second-person present tense. FLUX paints the scene in the same style across the whole book.",
+              title: "Turn the page",
+              body: "Claude writes 150-250 words of second-person present tense. FLUX paints a matching illustration. A depth model turns it into a subtle 3D scene that pans as you read.",
             },
             {
               step: "03",
+              title: "Hear it aloud",
+              body: "One click and a narrator reads the page in your ear. Neural Azure voice, auto-generated while the page loads -- no waiting at the click.",
+            },
+            {
+              step: "04",
               title: "Choose your path",
-              body: "Two or three distinct choices at the foot of the page. Click one; the next page is written around your decision.",
+              body: "Two or three distinct choices at the foot of each page. Click one; the next page is written around your decision. Share the link when you're done.",
             },
           ].map((c) => (
             <article
@@ -85,8 +90,9 @@ export default function LandingPage() {
               <p className="font-serif text-xl mb-3" style={{ color: "var(--ivory)" }}>Narrative</p>
               <p>
                 Claude Haiku 4.5 generates every page as a structured tool call --
-                a narrative, an image prompt, 2-3 divergent choices, and a short running
-                summary that becomes the next page's memory.
+                a narrative, an image prompt, 2-3 divergent choices, and a running
+                summary that becomes the next page's memory. Prompted for hooks,
+                stakes, dilemmic choices, and depth-friendly composition.
               </p>
             </div>
             <div>
@@ -98,19 +104,37 @@ export default function LandingPage() {
               </p>
             </div>
             <div>
+              <p className="font-serif text-xl mb-3" style={{ color: "var(--ivory)" }}>Narration</p>
+              <p>
+                Microsoft Edge's Azure Neural voices, called through a Python sidecar
+                and cached per page as MP3. First play pays the synthesis cost;
+                every replay is a static file.
+              </p>
+            </div>
+            <div>
+              <p className="font-serif text-xl mb-3" style={{ color: "var(--ivory)" }}>Depth &amp; parallax</p>
+              <p>
+                Depth-Anything-V2 runs on CPU in a second sidecar, producing a
+                per-pixel depth map. A three.js shader displaces a plane mesh by
+                that depth; a virtual camera orbits it gently, and closer pixels
+                slide further than the background. Auto-tuned per image.
+              </p>
+            </div>
+            <div>
               <p className="font-serif text-xl mb-3" style={{ color: "var(--ivory)" }}>Safety</p>
               <p>
-                Topic blocklist before generation, an explicit PG-13 content policy in
-                the system prompt, and an image-prompt validator before anything
+                Topic blocklist before generation, an explicit PG-13 content policy
+                in the system prompt, and an image-prompt validator before anything
                 reaches the painters.
               </p>
             </div>
             <div>
               <p className="font-serif text-xl mb-3" style={{ color: "var(--ivory)" }}>Architecture</p>
               <p>
-                Go hexagonal backend (ports + adapters) on Oracle Cloud, Next.js static
-                export on Cloudflare Pages. Swapping Claude for another provider, or
-                FLUX for another painter, is one file.
+                Go hexagonal backend with Python sidecars for TTS and depth, on
+                Oracle Cloud ARM. Next.js static export on Cloudflare Pages. SQLite
+                for story + user persistence, Google OAuth for sign-in. Each
+                provider is one adapter file behind a port.
               </p>
             </div>
           </div>
