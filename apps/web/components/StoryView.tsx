@@ -85,10 +85,39 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
       />
     );
 
+  const pageNav = (
+    <nav className="flex items-center justify-between text-xs" style={{ color: "var(--stone-gray)" }}>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={goPrev}
+          disabled={!canGoPrev}
+          className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
+          aria-label="Previous page"
+        >
+          &larr; Prev
+        </button>
+        <button
+          type="button"
+          onClick={goNext}
+          disabled={!canGoNext}
+          className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
+          aria-label="Next page"
+        >
+          Next &rarr;
+        </button>
+      </div>
+      <div>
+        Page {cursor + 1} of {pages.length}
+      </div>
+    </nav>
+  );
+
   return (
     <article className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
       <div className="lg:sticky lg:top-8">{illustration}</div>
       <div className="space-y-6">
+        {pageNav}
         <NarrativeBlock text={current.narrative} />
         <div className="flex flex-wrap items-center gap-2">
           <PlayButton
@@ -148,32 +177,12 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
           </div>
         )}
         {error && <p className="text-sm" style={{ color: "var(--crimson)" }}>{error}</p>}
-        <footer className="flex items-center justify-between pt-4 text-xs" style={{ color: "var(--stone-gray)" }}>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={goPrev}
-              disabled={!canGoPrev}
-              className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
-              aria-label="Previous page"
-            >
-              &larr; Prev
-            </button>
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={!canGoNext}
-              className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
-              aria-label="Next page"
-            >
-              Next &rarr;
-            </button>
-          </div>
-          <div>
-            Page {cursor + 1} of {pages.length}
-            {current.imageProvider ? ` -- art via ${current.imageProvider}` : ""}
-          </div>
-        </footer>
+        <div className="pt-4">{pageNav}</div>
+        {current.imageProvider && (
+          <footer className="text-xs text-right" style={{ color: "var(--stone-gray)" }}>
+            art via {current.imageProvider}
+          </footer>
+        )}
       </div>
     </article>
   );
