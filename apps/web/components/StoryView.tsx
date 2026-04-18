@@ -20,6 +20,7 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
     current,
     cursor,
     topic,
+    title,
     atLatest,
     canGoPrev,
     canGoNext,
@@ -138,14 +139,19 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
   return (
     <article className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4 mb-2">
-        {topic ? (
+        {title || topic ? (
           <div>
             <p className="uppercase tracking-[0.15em] text-xs" style={{ color: "var(--stone-gray)" }}>
-              An adventure about
+              {title ? "An adventure" : "An adventure about"}
             </p>
             <h1 className="font-serif text-2xl md:text-3xl tracking-tight" style={{ color: "var(--near-black)" }}>
-              {topic}
+              {title || topic}
             </h1>
+            {title && topic && title !== topic && (
+              <p className="text-sm mt-1" style={{ color: "var(--stone-gray)" }}>
+                {topic}
+              </p>
+            )}
           </div>
         ) : (
           <div />

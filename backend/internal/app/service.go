@@ -135,6 +135,11 @@ func (s *Service) StartStory(ctx context.Context, in domain.StartStoryInput) (do
 	if err != nil {
 		return domain.StartStoryOutput{}, err
 	}
+	if page.Title != "" {
+		if err := s.stories.UpdateStoryTitle(ctx, story.ID, page.Title); err != nil {
+			s.log.Warn().Err(err).Str("story_id", story.ID).Msg("persist story title failed")
+		}
+	}
 
 	return domain.StartStoryOutput{
 		StoryID:     story.ID,
@@ -251,6 +256,8 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 		IsEnding:       draft.IsEnding,
 		EndingType:     draft.EndingType,
 		RunningSummary: draft.RunningSummary,
+		Language:       draft.Language,
+		Title:          draft.Title,
 		CreatedAt:      s.now(),
 	}
 
@@ -381,7 +388,7 @@ func (s *Service) GenerateSpeech(ctx context.Context, storyID string, seq int) (
 		return page.AudioURL, nil
 	}
 
-	res, err := s.tts.Synthesize(ctx, ports.TTSRequest{Text: page.Narrative})
+	res, err := s.tts.Synthesize(ctx, ports.TTSRequest{Text: page.Narrative, Language: page.Language})
 	if err != nil {
 		s.log.Warn().Err(err).Str("story_id", storyID).Int("seq", seq).Msg("tts synthesize failed")
 		return "", domain.ErrTTSUnavailable

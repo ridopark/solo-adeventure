@@ -43,11 +43,13 @@ type StoryStore interface {
 	AttachUser(ctx context.Context, storyID, userID string) error
 	UpdatePageAudio(ctx context.Context, storyID string, idx int, audioURL string) error
 	UpdatePageDepth(ctx context.Context, storyID string, idx int, depthURL string) error
+	UpdateStoryTitle(ctx context.Context, storyID, title string) error
 }
 
 type TTSRequest struct {
-	Text  string
-	Voice string
+	Text     string
+	Voice    string
+	Language string
 }
 
 type TTSResult struct {

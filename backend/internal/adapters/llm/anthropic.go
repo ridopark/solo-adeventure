@@ -26,6 +26,7 @@ const systemPromptNextPage = `You are the author of a choose-your-own-adventure 
 - Detect the natural language of the reader's topic and write the narrative and all choice labels in that same language.
 - Keep imagePrompt, runningSummary, and endingType in English regardless of the narrative language -- they feed downstream systems (FLUX, your own memory, an enum).
 - If the topic is ambiguous or mixed, default to English.
+- Emit a BCP-47 language tag in the language field: en-US, en-GB, ko-KR, ja-JP, zh-CN, zh-TW, es-ES, es-MX, fr-FR, de-DE, it-IT, pt-BR, pt-PT, nl-NL, ru-RU, pl-PL, tr-TR, ar-SA, hi-IN, vi-VN, th-TH, id-ID. When you're writing English, emit en-US.
 
 ## Style
 - Second person, present tense. Consistent voice across every page.
@@ -74,7 +75,8 @@ const systemPromptNextPage = `You are the author of a choose-your-own-adventure 
 
 ## Output
 - Always invoke the emit_page tool. Never respond as plain text.
-- runningSummary is 2-3 sentences capturing the WHOLE story so far, including the reader's current situation. It is the only memory the next page will have.`
+- runningSummary is 2-3 sentences capturing the WHOLE story so far, including the reader's current situation. It is the only memory the next page will have.
+- On page 1, emit a short title (2-6 words) that names the story evocatively, in the same language as the narrative. On subsequent pages, leave title empty.`
 
 const systemPromptStyle = "You produce short illustrator style descriptors (8-15 words) for storybook art. Favor cinematic, depth-rich, atmospheric styles that suit layered foreground/background composition. Output ONLY the descriptor; no preamble, no quotes."
 
@@ -85,14 +87,16 @@ const imagePromptDepthSuffix = ". Cinematic composition with clear foreground, m
 
 var emitPageInputSchema = json.RawMessage(`{
   "type": "object",
-  "required": ["narrative", "imagePrompt", "choices", "isEnding", "runningSummary"],
+  "required": ["narrative", "imagePrompt", "choices", "isEnding", "runningSummary", "language"],
   "properties": {
+    "title":          { "type": "string", "description": "Short evocative story title, 2-6 words, in the same language as the narrative. Emit on page 1; empty string on later pages." },
     "narrative":      { "type": "string", "description": "150-250 words, second person, present tense" },
-    "imagePrompt":    { "type": "string", "description": "visual-only description of this scene; no dialogue, no text" },
+    "imagePrompt":    { "type": "string", "description": "visual-only description of this scene; no dialogue, no text; English only" },
     "choices":        { "type": "array", "minItems": 0, "maxItems": 3, "items": { "type": "object", "required": ["label"], "properties": { "label": { "type": "string" } } } },
     "isEnding":       { "type": "boolean" },
     "endingType":     { "type": "string", "enum": ["victory", "defeat", "twist", ""] },
-    "runningSummary": { "type": "string", "description": "2-3 sentence summary of the whole story so far, used as context for the next page" }
+    "runningSummary": { "type": "string", "description": "2-3 sentence summary of the whole story so far, used as context for the next page; English only" },
+    "language":       { "type": "string", "description": "BCP-47 tag for the narrative language (en-US, ko-KR, es-ES, ...)" }
   }
 }`)
 
@@ -164,12 +168,14 @@ type anthropicResponse struct {
 }
 
 type emitPageInput struct {
+	Title          string          `json:"title"`
 	Narrative      string          `json:"narrative"`
 	ImagePrompt    string          `json:"imagePrompt"`
 	Choices        []domain.Choice `json:"choices"`
 	IsEnding       bool            `json:"isEnding"`
 	EndingType     string          `json:"endingType"`
 	RunningSummary string          `json:"runningSummary"`
+	Language       string          `json:"language"`
 }
 
 func (a *Anthropic) StartStyle(ctx context.Context, topic string) (domain.StylePrefix, error) {
@@ -299,12 +305,14 @@ func parseToolUse(resp *anthropicResponse) (domain.PageDraft, error) {
 			return domain.PageDraft{}, fmt.Errorf("unmarshal tool input: %w", err)
 		}
 		return domain.PageDraft{
+			Title:          strings.TrimSpace(input.Title),
 			Narrative:      input.Narrative,
 			ImagePrompt:    appendDepthSuffix(input.ImagePrompt),
 			Choices:        input.Choices,
 			IsEnding:       input.IsEnding,
 			EndingType:     domain.EndingType(input.EndingType),
 			RunningSummary: input.RunningSummary,
+			Language:       strings.TrimSpace(input.Language),
 		}, nil
 	}
 	return domain.PageDraft{}, errors.New("no tool_use block in response")

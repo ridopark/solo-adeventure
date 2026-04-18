@@ -8,12 +8,75 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/ridopark/solo-adeventure/backend/internal/ports"
 )
+
+// voicesByLanguage maps BCP-47 tags to edge-tts (Azure Neural) voice names.
+// Add a locale-less key for common languages so "ko" also resolves.
+var voicesByLanguage = map[string]string{
+	"en-US": "en-US-AndrewNeural",
+	"en-GB": "en-GB-RyanNeural",
+	"en":    "en-US-AndrewNeural",
+	"ko-KR": "ko-KR-InJoonNeural",
+	"ko":    "ko-KR-InJoonNeural",
+	"ja-JP": "ja-JP-KeitaNeural",
+	"ja":    "ja-JP-KeitaNeural",
+	"zh-CN": "zh-CN-YunxiNeural",
+	"zh-TW": "zh-TW-YunJheNeural",
+	"zh":    "zh-CN-YunxiNeural",
+	"es-ES": "es-ES-AlvaroNeural",
+	"es-MX": "es-MX-JorgeNeural",
+	"es":    "es-ES-AlvaroNeural",
+	"fr-FR": "fr-FR-HenriNeural",
+	"fr":    "fr-FR-HenriNeural",
+	"de-DE": "de-DE-ConradNeural",
+	"de":    "de-DE-ConradNeural",
+	"it-IT": "it-IT-DiegoNeural",
+	"it":    "it-IT-DiegoNeural",
+	"pt-BR": "pt-BR-AntonioNeural",
+	"pt-PT": "pt-PT-DuarteNeural",
+	"pt":    "pt-BR-AntonioNeural",
+	"nl-NL": "nl-NL-MaartenNeural",
+	"nl":    "nl-NL-MaartenNeural",
+	"ru-RU": "ru-RU-DmitryNeural",
+	"ru":    "ru-RU-DmitryNeural",
+	"pl-PL": "pl-PL-MarekNeural",
+	"pl":    "pl-PL-MarekNeural",
+	"tr-TR": "tr-TR-AhmetNeural",
+	"tr":    "tr-TR-AhmetNeural",
+	"ar-SA": "ar-SA-HamedNeural",
+	"ar":    "ar-SA-HamedNeural",
+	"hi-IN": "hi-IN-MadhurNeural",
+	"hi":    "hi-IN-MadhurNeural",
+	"vi-VN": "vi-VN-NamMinhNeural",
+	"vi":    "vi-VN-NamMinhNeural",
+	"th-TH": "th-TH-NiwatNeural",
+	"th":    "th-TH-NiwatNeural",
+	"id-ID": "id-ID-ArdiNeural",
+	"id":    "id-ID-ArdiNeural",
+}
+
+func voiceForLanguage(lang string) string {
+	if lang == "" {
+		return ""
+	}
+	tag := strings.TrimSpace(lang)
+	if v, ok := voicesByLanguage[tag]; ok {
+		return v
+	}
+	// Fall back to the primary subtag: "ko-KR" -> "ko"
+	if dash := strings.Index(tag, "-"); dash > 0 {
+		if v, ok := voicesByLanguage[tag[:dash]]; ok {
+			return v
+		}
+	}
+	return ""
+}
 
 type Edge struct {
 	baseURL string
@@ -38,6 +101,9 @@ type edgeReqBody struct {
 
 func (e *Edge) Synthesize(ctx context.Context, req ports.TTSRequest) (ports.TTSResult, error) {
 	voice := req.Voice
+	if voice == "" {
+		voice = voiceForLanguage(req.Language)
+	}
 	if voice == "" {
 		voice = e.voice
 	}

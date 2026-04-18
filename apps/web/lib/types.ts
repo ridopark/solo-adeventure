@@ -6,6 +6,7 @@ export interface Choice {
 
 export interface Page {
   index: number;
+  title?: string;
   narrative: string;
   imageUrl: string | null;
   imageProvider?: string;
@@ -20,6 +21,7 @@ export interface Page {
 export interface Story {
   storyId: string;
   topic: string;
+  title?: string;
   stylePrefix: string;
   pages: Page[];
   createdAt: string;

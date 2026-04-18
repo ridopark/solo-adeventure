@@ -96,6 +96,19 @@ func (m *Memory) UpdatePageDepth(_ context.Context, storyID string, idx int, dep
 	return nil
 }
 
+func (m *Memory) UpdateStoryTitle(_ context.Context, storyID, title string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.stories[storyID]
+	if !ok {
+		return domain.ErrStoryNotFound
+	}
+	s.Title = title
+	s.UpdatedAt = m.now()
+	m.stories[storyID] = s
+	return nil
+}
+
 func (m *Memory) AttachUser(_ context.Context, storyID, userID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

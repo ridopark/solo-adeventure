@@ -13,6 +13,7 @@ interface State {
   pages: Page[];
   stylePrefix: string;
   topic: string;
+  title: string;
   cursor: number;
   error?: string;
 }
@@ -27,7 +28,7 @@ type Action =
   | { type: "goto"; cursor: number }
   | { type: "reset" };
 
-const initial: State = { status: "hydrating", pages: [], stylePrefix: "", topic: "", cursor: 0 };
+const initial: State = { status: "hydrating", pages: [], stylePrefix: "", topic: "", title: "", cursor: 0 };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -43,6 +44,7 @@ function reducer(state: State, action: Action): State {
         pages: action.story.pages,
         stylePrefix: action.story.stylePrefix,
         topic: action.story.topic ?? state.topic,
+        title: action.story.title ?? action.story.pages[0]?.title ?? state.title,
         cursor,
       };
     }
@@ -52,6 +54,7 @@ function reducer(state: State, action: Action): State {
         pages: [action.start.page],
         stylePrefix: action.start.stylePrefix,
         topic: state.topic,
+        title: action.start.page.title ?? state.title,
         cursor: 0,
       };
     case "choose_start":
@@ -63,6 +66,7 @@ function reducer(state: State, action: Action): State {
         pages,
         stylePrefix: state.stylePrefix,
         topic: state.topic,
+        title: state.title,
         cursor: pages.length - 1,
       };
     }
@@ -173,6 +177,7 @@ export function useStory(storyId: string, opts: { startAt?: number } = {}) {
     current: state.pages[state.cursor] ?? null,
     cursor: state.cursor,
     topic: state.topic,
+    title: state.title,
     atLatest,
     canGoPrev: state.cursor > 0,
     canGoNext: state.cursor < state.pages.length - 1,

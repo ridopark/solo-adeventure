@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS stories (
 	id TEXT PRIMARY KEY,
 	user_id TEXT REFERENCES users(id),
 	topic TEXT NOT NULL,
+	title TEXT,
 	style_prefix TEXT NOT NULL,
 	created_at DATETIME NOT NULL,
 	updated_at DATETIME NOT NULL
@@ -84,6 +85,12 @@ func NewSQLite(path string) (*SQLite, error) {
 	if _, err := db.Exec(`ALTER TABLE pages ADD COLUMN depth_url TEXT`); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
 		return nil, fmt.Errorf("sqlite: migrate depth_url: %w", err)
 	}
+	if _, err := db.Exec(`ALTER TABLE pages ADD COLUMN language TEXT`); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return nil, fmt.Errorf("sqlite: migrate language: %w", err)
+	}
+	if _, err := db.Exec(`ALTER TABLE stories ADD COLUMN title TEXT`); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
+		return nil, fmt.Errorf("sqlite: migrate stories.title: %w", err)
+	}
 	return &SQLite{db: db}, nil
 }
 
@@ -104,10 +111,10 @@ func (s *SQLite) Create(ctx context.Context, st domain.Story) error {
 
 func (s *SQLite) Get(ctx context.Context, id string) (domain.Story, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, COALESCE(user_id,''), topic, style_prefix, created_at, updated_at FROM stories WHERE id = ?`, id)
+		`SELECT id, COALESCE(user_id,''), topic, COALESCE(title,''), style_prefix, created_at, updated_at FROM stories WHERE id = ?`, id)
 	var st domain.Story
 	var style string
-	if err := row.Scan(&st.ID, &st.UserID, &st.Topic, &style, &st.CreatedAt, &st.UpdatedAt); err != nil {
+	if err := row.Scan(&st.ID, &st.UserID, &st.Topic, &st.Title, &style, &st.CreatedAt, &st.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Story{}, domain.ErrStoryNotFound
 		}
@@ -124,7 +131,7 @@ func (s *SQLite) Get(ctx context.Context, id string) (domain.Story, error) {
 
 func (s *SQLite) loadPages(ctx context.Context, storyID string) ([]domain.Page, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT idx, narrative, COALESCE(image_prompt,''), COALESCE(image_url,''), COALESCE(image_provider,''), COALESCE(audio_url,''), COALESCE(depth_url,''), choices, is_ending, COALESCE(ending_type,''), COALESCE(running_summary,''), created_at
+		`SELECT idx, narrative, COALESCE(image_prompt,''), COALESCE(image_url,''), COALESCE(image_provider,''), COALESCE(audio_url,''), COALESCE(depth_url,''), COALESCE(language,''), choices, is_ending, COALESCE(ending_type,''), COALESCE(running_summary,''), created_at
 		 FROM pages WHERE story_id = ? ORDER BY idx ASC`, storyID)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: pages load: %w", err)
@@ -135,7 +142,7 @@ func (s *SQLite) loadPages(ctx context.Context, storyID string) ([]domain.Page, 
 		var p domain.Page
 		var choicesJSON, endingType string
 		var isEndingI int
-		if err := rows.Scan(&p.Index, &p.Narrative, &p.ImagePrompt, &p.ImageURL, &p.ImageProvider, &p.AudioURL, &p.DepthURL, &choicesJSON, &isEndingI, &endingType, &p.RunningSummary, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.Index, &p.Narrative, &p.ImagePrompt, &p.ImageURL, &p.ImageProvider, &p.AudioURL, &p.DepthURL, &p.Language, &choicesJSON, &isEndingI, &endingType, &p.RunningSummary, &p.CreatedAt); err != nil {
 			return nil, fmt.Errorf("sqlite: pages scan: %w", err)
 		}
 		p.IsEnding = isEndingI != 0
@@ -171,9 +178,9 @@ func (s *SQLite) AppendPage(ctx context.Context, storyID string, p domain.Page) 
 		isEndingI = 1
 	}
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO pages (story_id, idx, narrative, image_prompt, image_url, image_provider, choices, is_ending, ending_type, running_summary, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		storyID, p.Index, p.Narrative, p.ImagePrompt, p.ImageURL, p.ImageProvider, string(choicesJSON), isEndingI, string(p.EndingType), p.RunningSummary, p.CreatedAt,
+		`INSERT INTO pages (story_id, idx, narrative, image_prompt, image_url, image_provider, language, choices, is_ending, ending_type, running_summary, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		storyID, p.Index, p.Narrative, p.ImagePrompt, p.ImageURL, p.ImageProvider, p.Language, string(choicesJSON), isEndingI, string(p.EndingType), p.RunningSummary, p.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("sqlite: page insert: %w", err)
@@ -189,7 +196,7 @@ func (s *SQLite) ListByUser(ctx context.Context, userID string, limit int) ([]do
 		limit = 50
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT s.id, s.user_id, s.topic, s.style_prefix, s.created_at, s.updated_at
+		`SELECT s.id, s.user_id, s.topic, COALESCE(s.title,''), s.style_prefix, s.created_at, s.updated_at
 		 FROM stories s WHERE s.user_id = ? ORDER BY s.updated_at DESC LIMIT ?`, userID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("sqlite: list stories: %w", err)
@@ -199,7 +206,7 @@ func (s *SQLite) ListByUser(ctx context.Context, userID string, limit int) ([]do
 	for rows.Next() {
 		var st domain.Story
 		var style string
-		if err := rows.Scan(&st.ID, &st.UserID, &st.Topic, &style, &st.CreatedAt, &st.UpdatedAt); err != nil {
+		if err := rows.Scan(&st.ID, &st.UserID, &st.Topic, &st.Title, &style, &st.CreatedAt, &st.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("sqlite: list scan: %w", err)
 		}
 		st.StylePrefix = domain.StylePrefix(style)
@@ -214,6 +221,20 @@ func (s *SQLite) UpdatePageAudio(ctx context.Context, storyID string, idx int, a
 		audioURL, storyID, idx)
 	if err != nil {
 		return fmt.Errorf("sqlite: update audio: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return domain.ErrStoryNotFound
+	}
+	return nil
+}
+
+func (s *SQLite) UpdateStoryTitle(ctx context.Context, storyID, title string) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE stories SET title = ?, updated_at = ? WHERE id = ?`,
+		title, time.Now().UTC(), storyID)
+	if err != nil {
+		return fmt.Errorf("sqlite: update title: %w", err)
 	}
 	n, _ := res.RowsAffected()
 	if n == 0 {
