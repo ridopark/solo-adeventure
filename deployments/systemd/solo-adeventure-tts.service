@@ -1,0 +1,18 @@
+[Unit]
+Description=solo-adeventure TTS sidecar (edge-tts)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/solo-adeventure/tts
+ExecStart=/opt/solo-adeventure/tts/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8085
+Restart=on-failure
+RestartSec=5
+ProtectSystem=strict
+ReadWritePaths=/opt/solo-adeventure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

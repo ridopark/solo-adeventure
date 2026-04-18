@@ -38,6 +38,10 @@ export const api = {
     if (returnTo) u.searchParams.set("return_to", returnTo);
     return u.toString();
   },
+  speech: (storyId: string, seq: number) =>
+    request<{ audioUrl: string }>(`/stories/${storyId}/pages/${seq}/speech`, {
+      method: "POST",
+    }),
   visit: (path: string) =>
     request<{ status: string }>("/visit", {
       method: "POST",

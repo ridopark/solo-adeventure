@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -25,6 +26,7 @@ type RouterConfig struct {
 	FrontendURL  string
 	CookieDomain string
 	Secure       bool
+	AudioDir     string
 }
 
 func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Handler {
@@ -42,6 +44,7 @@ func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Hand
 	mux.HandleFunc("GET /stories/{id}", r.getStory)
 	mux.HandleFunc("POST /stories/{id}/choose", r.chooseStory)
 	mux.HandleFunc("POST /stories/{id}/claim", r.claimStory)
+	mux.HandleFunc("POST /stories/{id}/pages/{seq}/speech", r.generateSpeech)
 	mux.HandleFunc("GET /stories", r.myStories)
 	mux.HandleFunc("POST /images", r.generateImage)
 	mux.HandleFunc("POST /visit", r.visit)
@@ -49,6 +52,10 @@ func NewRouter(svc *app.Service, log zerolog.Logger, cfg RouterConfig) http.Hand
 	mux.HandleFunc("GET /auth/google/callback", r.authCallback)
 	mux.HandleFunc("POST /auth/logout", r.authLogout)
 	mux.HandleFunc("GET /auth/me", r.authMe)
+
+	if cfg.AudioDir != "" {
+		mux.Handle("GET /audio/", http.StripPrefix("/audio/", http.FileServer(http.Dir(cfg.AudioDir))))
+	}
 
 	var h http.Handler = mux
 	h = session(svc, r.log, h)
@@ -183,6 +190,30 @@ func (r *Router) generateImage(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (r *Router) generateSpeech(w http.ResponseWriter, req *http.Request) {
+	id := req.PathValue("id")
+	seqStr := req.PathValue("seq")
+	seq, err := strconv.Atoi(seqStr)
+	if err != nil || seq < 0 {
+		writeError(w, http.StatusBadRequest, "invalid page index")
+		return
+	}
+	url, err := r.svc.GenerateSpeech(req.Context(), id, seq)
+	if err != nil {
+		switch {
+		case errors.Is(err, domain.ErrStoryNotFound), errors.Is(err, domain.ErrPageNotFound):
+			writeError(w, http.StatusNotFound, "page not found")
+		case errors.Is(err, domain.ErrTTSUnavailable):
+			writeError(w, http.StatusServiceUnavailable, "narration unavailable")
+		default:
+			r.log.Error().Err(err).Msg("generate speech")
+			writeError(w, http.StatusBadGateway, "narration failed")
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"audioUrl": url})
 }
 
 func (r *Router) visit(w http.ResponseWriter, req *http.Request) {

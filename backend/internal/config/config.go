@@ -28,6 +28,11 @@ type Config struct {
 	GoogleOAuthSecret   string
 	GoogleRedirectURI   string
 	OAuthProvider       string
+	TTSEnabled          bool
+	TTSURL              string
+	TTSVoice            string
+	AudioDir            string
+	AudioURLBase        string
 }
 
 func Load() Config {
@@ -53,6 +58,11 @@ func Load() Config {
 		GoogleOAuthSecret:   os.Getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
 		GoogleRedirectURI:   getenv("GOOGLE_REDIRECT_URI", "http://localhost:8084/auth/google/callback"),
 		OAuthProvider:       getenv("OAUTH_PROVIDER", "google"),
+		TTSEnabled:          getenv("TTS_ENABLED", "true") == "true",
+		TTSURL:              getenv("TTS_URL", "http://127.0.0.1:8085"),
+		TTSVoice:            getenv("TTS_VOICE", "en-US-AndrewNeural"),
+		AudioDir:            getenv("AUDIO_DIR", "./audio"),
+		AudioURLBase:        getenv("AUDIO_URL_BASE", "/audio/"),
 	}
 }
 

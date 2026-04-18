@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,16 +17,19 @@ import (
 )
 
 type Service struct {
-	stories  ports.StoryStore
-	story    ports.StoryProvider
-	images   ports.ImageProvider
-	notifier ports.Notifier
-	users    ports.UserStore
-	sessions ports.SessionStore
-	oauth    ports.OAuthProvider
-	log      zerolog.Logger
-	now      func() time.Time
-	newID    func() string
+	stories    ports.StoryStore
+	story      ports.StoryProvider
+	images     ports.ImageProvider
+	notifier   ports.Notifier
+	users      ports.UserStore
+	sessions   ports.SessionStore
+	oauth      ports.OAuthProvider
+	tts        ports.TTSProvider
+	audioDir   string
+	audioBase  string
+	log        zerolog.Logger
+	now        func() time.Time
+	newID      func() string
 }
 
 func NewService(store ports.StoryStore, sp ports.StoryProvider, ip ports.ImageProvider, notifier ports.Notifier, log zerolog.Logger) *Service {
@@ -45,6 +50,16 @@ func (s *Service) WithAuth(users ports.UserStore, sessions ports.SessionStore, o
 	s.users = users
 	s.sessions = sessions
 	s.oauth = oauth
+	return s
+}
+
+// WithTTS wires the optional narration sidecar. audioDir is where cached MP3s
+// live on disk; audioBase is the URL prefix the frontend uses to fetch them
+// (must match the static file server mount).
+func (s *Service) WithTTS(tts ports.TTSProvider, audioDir, audioBase string) *Service {
+	s.tts = tts
+	s.audioDir = audioDir
+	s.audioBase = audioBase
 	return s
 }
 
@@ -279,6 +294,47 @@ func (s *Service) generatePage(ctx context.Context, story domain.Story, priorSum
 		return domain.Page{}, fmt.Errorf("app: append page: %w", err)
 	}
 	return page, nil
+}
+
+// GenerateSpeech returns a cached audio URL for a page narrative, synthesizing
+// it via the TTS sidecar on first call. Narrative text never mutates once a
+// page is written, so the first call pays the TTS cost and all subsequent
+// calls are free disk reads.
+func (s *Service) GenerateSpeech(ctx context.Context, storyID string, seq int) (string, error) {
+	if s.tts == nil || s.audioDir == "" {
+		return "", domain.ErrTTSUnavailable
+	}
+	story, err := s.stories.Get(ctx, storyID)
+	if err != nil {
+		return "", err
+	}
+	if seq < 0 || seq >= len(story.Pages) {
+		return "", domain.ErrPageNotFound
+	}
+	page := story.Pages[seq]
+	if page.AudioURL != "" {
+		return page.AudioURL, nil
+	}
+
+	res, err := s.tts.Synthesize(ctx, ports.TTSRequest{Text: page.Narrative})
+	if err != nil {
+		s.log.Warn().Err(err).Str("story_id", storyID).Int("seq", seq).Msg("tts synthesize failed")
+		return "", domain.ErrTTSUnavailable
+	}
+
+	filename := fmt.Sprintf("%s-%d.mp3", storyID, seq)
+	if err := os.MkdirAll(s.audioDir, 0o755); err != nil {
+		return "", fmt.Errorf("app: audio dir: %w", err)
+	}
+	path := filepath.Join(s.audioDir, filename)
+	if err := os.WriteFile(path, res.Audio, 0o644); err != nil {
+		return "", fmt.Errorf("app: write audio: %w", err)
+	}
+	url := s.audioBase + filename
+	if err := s.stories.UpdatePageAudio(ctx, storyID, seq, url); err != nil {
+		return "", fmt.Errorf("app: persist audio url: %w", err)
+	}
+	return url, nil
 }
 
 func truncate(s string, n int) string {

@@ -9,4 +9,6 @@ var (
 	ErrUnauthorized   = errors.New("authentication required")
 	ErrForbidden      = errors.New("not the story owner")
 	ErrSessionInvalid = errors.New("session invalid or expired")
+	ErrPageNotFound   = errors.New("page not found")
+	ErrTTSUnavailable = errors.New("tts unavailable")
 )

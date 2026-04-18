@@ -86,8 +86,8 @@ jobs:
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
-            sudo mkdir -p /opt/solo-adeventure
-            sudo chown ubuntu:ubuntu /opt/solo-adeventure
+            sudo mkdir -p /opt/solo-adeventure/tts /opt/solo-adeventure/audio /opt/solo-adeventure/staging
+            sudo chown -R ubuntu:ubuntu /opt/solo-adeventure
 
       - name: Copy binary to OCI
         uses: appleboy/scp-action@v0.1.7
@@ -98,6 +98,15 @@ jobs:
           source: backend/solo-adeventure-server
           target: /opt/solo-adeventure/
           strip_components: 1
+
+      - name: Copy TTS sidecar to OCI
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          source: services/tts/main.py,services/tts/requirements.txt,deployments/systemd/solo-adeventure-tts.service
+          target: /opt/solo-adeventure/staging/
 
       - name: Install/restart service
         uses: appleboy/ssh-action@v1
@@ -135,7 +144,37 @@ jobs:
             COOKIE_DOMAIN=.ridopark.com
             COOKIE_SECURE=true
             DB_PATH=/opt/solo-adeventure/solo-adeventure.db
+            TTS_ENABLED=true
+            TTS_URL=http://127.0.0.1:8085
+            TTS_VOICE=en-US-AndrewNeural
+            AUDIO_DIR=/opt/solo-adeventure/audio
+            AUDIO_URL_BASE=/audio/
             ENVEOF
+
+            # Install python3 + venv toolchain if missing (idempotent)
+            if ! command -v python3 >/dev/null 2>&1 || ! dpkg -s python3-venv >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo apt-get install -y python3 python3-venv python3-pip
+            fi
+
+            # Stage TTS sidecar files into place
+            mv /opt/solo-adeventure/staging/services/tts/main.py /opt/solo-adeventure/tts/main.py
+            mv /opt/solo-adeventure/staging/services/tts/requirements.txt /opt/solo-adeventure/tts/requirements.txt
+            sudo mv /opt/solo-adeventure/staging/deployments/systemd/solo-adeventure-tts.service /etc/systemd/system/solo-adeventure-tts.service
+            rm -rf /opt/solo-adeventure/staging
+
+            # Create or reuse venv, install/upgrade deps
+            if [ ! -d /opt/solo-adeventure/tts/venv ]; then
+              python3 -m venv /opt/solo-adeventure/tts/venv
+            fi
+            /opt/solo-adeventure/tts/venv/bin/pip install --quiet --upgrade pip
+            /opt/solo-adeventure/tts/venv/bin/pip install --quiet -r /opt/solo-adeventure/tts/requirements.txt
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable solo-adeventure-tts
+            sudo systemctl restart solo-adeventure-tts
+            sleep 3
+            curl -sf http://127.0.0.1:8085/health && echo " tts up"
 
             if [ ! -f /etc/systemd/system/solo-adeventure-server.service ]; then
               sudo tee /etc/systemd/system/solo-adeventure-server.service << 'SVCEOF'

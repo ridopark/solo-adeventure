@@ -41,6 +41,21 @@ type StoryStore interface {
 	AppendPage(ctx context.Context, storyID string, p domain.Page) error
 	ListByUser(ctx context.Context, userID string, limit int) ([]domain.Story, error)
 	AttachUser(ctx context.Context, storyID, userID string) error
+	UpdatePageAudio(ctx context.Context, storyID string, idx int, audioURL string) error
+}
+
+type TTSRequest struct {
+	Text  string
+	Voice string
+}
+
+type TTSResult struct {
+	Audio  []byte
+	Format string
+}
+
+type TTSProvider interface {
+	Synthesize(ctx context.Context, req TTSRequest) (TTSResult, error)
 }
 
 type UserStore interface {

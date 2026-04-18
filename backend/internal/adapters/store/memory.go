@@ -66,6 +66,21 @@ func (m *Memory) ListByUser(_ context.Context, userID string, limit int) ([]doma
 	return out, nil
 }
 
+func (m *Memory) UpdatePageAudio(_ context.Context, storyID string, idx int, audioURL string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s, ok := m.stories[storyID]
+	if !ok {
+		return domain.ErrStoryNotFound
+	}
+	if idx < 0 || idx >= len(s.Pages) {
+		return domain.ErrStoryNotFound
+	}
+	s.Pages[idx].AudioURL = audioURL
+	m.stories[storyID] = s
+	return nil
+}
+
 func (m *Memory) AttachUser(_ context.Context, storyID, userID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

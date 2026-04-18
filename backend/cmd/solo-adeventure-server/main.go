@@ -12,6 +12,7 @@ import (
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/llm"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/notifier"
 	"github.com/ridopark/solo-adeventure/backend/internal/adapters/store"
+	"github.com/ridopark/solo-adeventure/backend/internal/adapters/tts"
 	"github.com/ridopark/solo-adeventure/backend/internal/app"
 	"github.com/ridopark/solo-adeventure/backend/internal/config"
 	"github.com/ridopark/solo-adeventure/backend/internal/logger"
@@ -40,11 +41,19 @@ func main() {
 	svc := app.NewService(db, storyProvider, imageProvider, notif, log).
 		WithAuth(db.Users(), db.Sessions(), oauthProvider)
 
+	if cfg.TTSEnabled {
+		svc = svc.WithTTS(tts.NewEdge(cfg.TTSURL, cfg.TTSVoice, log), cfg.AudioDir, cfg.AudioURLBase)
+		log.Info().Str("tts_url", cfg.TTSURL).Str("voice", cfg.TTSVoice).Msg("tts sidecar wired")
+	} else {
+		log.Info().Msg("TTS_ENABLED=false; narration disabled")
+	}
+
 	handler := httpadapter.NewRouter(svc, log, httpadapter.RouterConfig{
 		CORSOrigin:   cfg.CORSAllowOrigin,
 		FrontendURL:  cfg.FrontendURL,
 		CookieDomain: cfg.CookieDomain,
 		Secure:       cfg.CookieSecure,
+		AudioDir:     cfg.AudioDir,
 	})
 
 	server := &http.Server{

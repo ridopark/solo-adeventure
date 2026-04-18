@@ -9,6 +9,7 @@ export interface Page {
   narrative: string;
   imageUrl: string | null;
   imageProvider?: string;
+  audioUrl?: string;
   choices: Choice[];
   isEnding: boolean;
   endingType?: EndingType;

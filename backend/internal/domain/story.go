@@ -22,6 +22,7 @@ type Page struct {
 	ImagePrompt    string     `json:"-"`
 	ImageURL       string     `json:"imageUrl,omitempty"`
 	ImageProvider  string     `json:"imageProvider,omitempty"`
+	AudioURL       string     `json:"audioUrl,omitempty"`
 	Choices        []Choice   `json:"choices"`
 	IsEnding       bool       `json:"isEnding"`
 	EndingType     EndingType `json:"endingType,omitempty"`

@@ -7,6 +7,7 @@ import { ChoiceButtons } from "./ChoiceButtons";
 import { EndingCard } from "./EndingCard";
 import { Skeleton } from "./Skeleton";
 import { SignInPrompt } from "./SignInPrompt";
+import { PlayButton } from "./PlayButton";
 
 export function StoryView({ storyId }: { storyId: string }) {
   const { status, pages, current, error, choose, restart } = useStory(storyId);
@@ -19,6 +20,11 @@ export function StoryView({ storyId }: { storyId: string }) {
     <article className="space-y-6">
       <Illustration src={current.imageUrl} alt={`Page ${current.index + 1}`} />
       <NarrativeBlock text={current.narrative} />
+      <PlayButton
+        storyId={storyId}
+        seq={current.index}
+        initialAudioUrl={current.audioUrl}
+      />
       {status === "choosing" && <Skeleton variant="next" />}
       {status === "needs_auth" && <SignInPrompt />}
       {current.isEnding ? (
