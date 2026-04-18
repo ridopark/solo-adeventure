@@ -11,6 +11,7 @@ import { EndingCard } from "./EndingCard";
 import { Skeleton } from "./Skeleton";
 import { SignInPrompt } from "./SignInPrompt";
 import { PlayButton } from "./PlayButton";
+import { ShareButton } from "./ShareButton";
 
 export function StoryView({ storyId }: { storyId: string }) {
   const {
@@ -79,12 +80,15 @@ export function StoryView({ storyId }: { storyId: string }) {
       <div className="lg:sticky lg:top-8">{illustration}</div>
       <div className="space-y-6">
         <NarrativeBlock text={current.narrative} />
-        <PlayButton
-          storyId={storyId}
-          seq={current.index}
-          initialAudioUrl={current.audioUrl}
-          narrativeChars={current.narrative.length}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <PlayButton
+            storyId={storyId}
+            seq={current.index}
+            initialAudioUrl={current.audioUrl}
+            narrativeChars={current.narrative.length}
+          />
+          <ShareButton storyId={storyId} />
+        </div>
         {atLatest ? (
           <>
             {status === "choosing" && <Skeleton variant="next" />}
