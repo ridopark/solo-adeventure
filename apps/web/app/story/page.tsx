@@ -19,7 +19,7 @@ function StoryScreen() {
 
 export default function Page() {
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
+    <main className="mx-auto max-w-2xl lg:max-w-5xl px-6 py-10">
       <Suspense fallback={<p style={{ color: "var(--stone-gray)" }}>Loading...</p>}>
         <StoryScreen />
       </Suspense>

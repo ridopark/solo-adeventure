@@ -58,82 +58,87 @@ export function StoryView({ storyId }: { storyId: string }) {
     return <Skeleton variant="full" />;
   }
 
-  return (
-    <article className="space-y-6">
-      {current.imageUrl && depthUrl ? (
-        <ParallaxIllustration
-          imageSrc={current.imageUrl}
-          depthSrc={depthUrl}
-          alt={`Page ${current.index + 1}`}
-          seq={current.index}
-        />
-      ) : (
-        <Illustration
-          src={current.imageUrl}
-          alt={`Page ${current.index + 1}`}
-          seq={current.index}
-        />
-      )}
-      <NarrativeBlock text={current.narrative} />
-      <PlayButton
-        storyId={storyId}
+  const illustration =
+    current.imageUrl && depthUrl ? (
+      <ParallaxIllustration
+        imageSrc={current.imageUrl}
+        depthSrc={depthUrl}
+        alt={`Page ${current.index + 1}`}
         seq={current.index}
-        initialAudioUrl={current.audioUrl}
-        narrativeChars={current.narrative.length}
       />
-      {atLatest ? (
-        <>
-          {status === "choosing" && <Skeleton variant="next" />}
-          {status === "needs_auth" && <SignInPrompt />}
-          {current.isEnding ? (
-            <EndingCard endingType={current.endingType} onRestart={restart} />
-          ) : (
-            <ChoiceButtons
-              choices={current.choices}
-              disabled={status === "choosing" || status === "needs_auth"}
-              onChoose={choose}
-            />
-          )}
-        </>
-      ) : (
-        <div className="rounded-md border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-600">
-          You're reading an earlier page.{" "}
-          <button
-            type="button"
-            onClick={goLatest}
-            className="underline underline-offset-2 hover:text-stone-900"
-          >
-            Jump to the current page &rarr;
-          </button>
-        </div>
-      )}
-      {error && <p className="text-sm" style={{ color: "var(--crimson)" }}>{error}</p>}
-      <footer className="flex items-center justify-between pt-4 text-xs" style={{ color: "var(--stone-gray)" }}>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={!canGoPrev}
-            className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
-            aria-label="Previous page"
-          >
-            &larr; Prev
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={!canGoNext}
-            className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
-            aria-label="Next page"
-          >
-            Next &rarr;
-          </button>
-        </div>
-        <div>
-          Page {cursor + 1} of {pages.length}
-          {current.imageProvider ? ` -- art via ${current.imageProvider}` : ""}
-        </div>
-      </footer>
+    ) : (
+      <Illustration
+        src={current.imageUrl}
+        alt={`Page ${current.index + 1}`}
+        seq={current.index}
+      />
+    );
+
+  return (
+    <article className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start lg:gap-10">
+      <div className="lg:sticky lg:top-8">{illustration}</div>
+      <div className="space-y-6">
+        <NarrativeBlock text={current.narrative} />
+        <PlayButton
+          storyId={storyId}
+          seq={current.index}
+          initialAudioUrl={current.audioUrl}
+          narrativeChars={current.narrative.length}
+        />
+        {atLatest ? (
+          <>
+            {status === "choosing" && <Skeleton variant="next" />}
+            {status === "needs_auth" && <SignInPrompt />}
+            {current.isEnding ? (
+              <EndingCard endingType={current.endingType} onRestart={restart} />
+            ) : (
+              <ChoiceButtons
+                choices={current.choices}
+                disabled={status === "choosing" || status === "needs_auth"}
+                onChoose={choose}
+              />
+            )}
+          </>
+        ) : (
+          <div className="rounded-md border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+            You're reading an earlier page.{" "}
+            <button
+              type="button"
+              onClick={goLatest}
+              className="underline underline-offset-2 hover:text-stone-900"
+            >
+              Jump to the current page &rarr;
+            </button>
+          </div>
+        )}
+        {error && <p className="text-sm" style={{ color: "var(--crimson)" }}>{error}</p>}
+        <footer className="flex items-center justify-between pt-4 text-xs" style={{ color: "var(--stone-gray)" }}>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={goPrev}
+              disabled={!canGoPrev}
+              className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
+              aria-label="Previous page"
+            >
+              &larr; Prev
+            </button>
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canGoNext}
+              className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
+              aria-label="Next page"
+            >
+              Next &rarr;
+            </button>
+          </div>
+          <div>
+            Page {cursor + 1} of {pages.length}
+            {current.imageProvider ? ` -- art via ${current.imageProvider}` : ""}
+          </div>
+        </footer>
+      </div>
     </article>
   );
 }
