@@ -39,6 +39,27 @@ export function StoryView({ storyId, startAt }: { storyId: string; startAt?: num
   }, [current?.index]);
 
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement | null)?.isContentEditable) return;
+      if (e.key === "ArrowLeft") {
+        if (canGoPrev) {
+          e.preventDefault();
+          goPrev();
+        }
+      } else if (e.key === "ArrowRight") {
+        if (canGoNext) {
+          e.preventDefault();
+          goNext();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canGoPrev, canGoNext, goPrev, goNext]);
+
+  useEffect(() => {
     setDepthUrl(current?.depthUrl);
     if (!current || current.depthUrl || !current.imageUrl) {
       if (current?.depthUrl) console.log(`[story] page seq=${current.index} already has depth`);
