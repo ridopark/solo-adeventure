@@ -8,6 +8,43 @@ function resolveURL(url: string) {
   return url.startsWith("http") ? url : `${BACKEND_URL}${url}`;
 }
 
+async function inspectDepth(url: string): Promise<void> {
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.crossOrigin = "anonymous";
+      el.onload = () => resolve(el);
+      el.onerror = reject;
+      el.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let min = 255;
+    let max = 0;
+    let sum = 0;
+    let n = 0;
+    const stride = 64;
+    for (let i = 0; i < data.length; i += 4 * stride) {
+      const v = data[i];
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+      n++;
+    }
+    const avg = Math.round(sum / n);
+    console.log(
+      `[parallax] depth stats ${canvas.width}x${canvas.height} min=${min} max=${max} avg=${avg} range=${max - min} (${max - min > 30 ? "OK" : "FLAT -- depth map has low variance"})`,
+    );
+  } catch (e) {
+    console.warn("[parallax] depth inspect failed", e);
+  }
+}
+
 const VERTEX_SHADER = /* glsl */ `
   uniform sampler2D depthMap;
   uniform float displacementScale;
@@ -46,6 +83,9 @@ export function ParallaxIllustration({
     const mount = mountRef.current;
     if (!mount) return;
 
+    console.log(`[parallax] init seq=${seq} image=${imageSrc} depth=${depthSrc}`);
+    void inspectDepth(resolveURL(depthSrc));
+
     let renderer: THREE.WebGLRenderer | null = null;
     let animationId = 0;
     let resizeObserver: ResizeObserver | null = null;
@@ -56,23 +96,41 @@ export function ParallaxIllustration({
       const height = mount.clientHeight || 512;
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 10);
-      camera.position.z = 2.6;
+      const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 10);
+      camera.position.z = 2.2;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(width, height, false);
       mount.appendChild(renderer.domElement);
+      console.log(`[parallax] webgl context created ${width}x${height} dpr=${renderer.getPixelRatio()}`);
 
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin("anonymous");
 
-      const loadTexture = (url: string) =>
+      const loadTexture = (url: string, label: string) =>
         new Promise<THREE.Texture>((resolve, reject) => {
-          loader.load(url, (t) => resolve(t), undefined, (e) => reject(e));
+          const t0 = performance.now();
+          loader.load(
+            url,
+            (t) => {
+              const ms = Math.round(performance.now() - t0);
+              const img = t.image as { width?: number; height?: number } | undefined;
+              console.log(`[parallax] texture loaded: ${label} ${img?.width}x${img?.height} in ${ms}ms`);
+              resolve(t);
+            },
+            undefined,
+            (e) => {
+              console.error(`[parallax] texture load failed: ${label}`, e);
+              reject(e);
+            },
+          );
         });
 
-      Promise.all([loadTexture(resolveURL(imageSrc)), loadTexture(resolveURL(depthSrc))])
+      Promise.all([
+        loadTexture(resolveURL(imageSrc), "color"),
+        loadTexture(resolveURL(depthSrc), "depth"),
+      ])
         .then(([colorTex, depthTex]) => {
           if (disposed) {
             colorTex.dispose();
@@ -90,7 +148,7 @@ export function ParallaxIllustration({
             uniforms: {
               colorMap: { value: colorTex },
               depthMap: { value: depthTex },
-              displacementScale: { value: 0.35 },
+              displacementScale: { value: 0.9 },
             },
           });
           const mesh = new THREE.Mesh(geometry, material);
@@ -98,13 +156,25 @@ export function ParallaxIllustration({
 
           const phase = (seq % 4) * (Math.PI / 2);
           const start = performance.now();
+          let frames = 0;
+          let lastSample = start;
+          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=0.9`);
           const render = () => {
             if (disposed) return;
-            const t = (performance.now() - start) * 0.0006;
-            camera.position.x = Math.sin(t + phase) * 0.22;
-            camera.position.y = Math.cos(t * 1.2 + phase) * 0.12;
+            const now = performance.now();
+            const t = (now - start) * 0.0006;
+            camera.position.x = Math.sin(t + phase) * 0.45;
+            camera.position.y = Math.cos(t * 1.2 + phase) * 0.25;
             camera.lookAt(0, 0, 0);
             renderer!.render(scene, camera);
+            frames++;
+            if (now - lastSample > 3000) {
+              console.log(
+                `[parallax] rendering ${(frames / ((now - lastSample) / 1000)).toFixed(1)} fps, cam=(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`,
+              );
+              frames = 0;
+              lastSample = now;
+            }
             animationId = requestAnimationFrame(render);
           };
           render();
@@ -128,15 +198,18 @@ export function ParallaxIllustration({
             depthTex.dispose();
           };
         })
-        .catch(() => {
+        .catch((e) => {
+          console.error("[parallax] falling back to still image", e);
           setFailed(true);
         });
-    } catch {
+    } catch (e) {
+      console.error("[parallax] webgl setup threw", e);
       setFailed(true);
     }
 
     return () => {
       disposed = true;
+      console.log(`[parallax] cleanup seq=${seq}`);
       if (animationId) cancelAnimationFrame(animationId);
       resizeObserver?.disconnect();
       const cleanup = (mount as unknown as { __cleanup?: () => void }).__cleanup;

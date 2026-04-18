@@ -26,7 +26,7 @@ func NewEdge(baseURL, voice string, log zerolog.Logger) *Edge {
 	return &Edge{
 		baseURL: baseURL,
 		voice:   voice,
-		client:  &http.Client{Timeout: 45 * time.Second},
+		client:  &http.Client{Timeout: 120 * time.Second},
 		log:     log.With().Str("component", "tts.edge").Logger(),
 	}
 }

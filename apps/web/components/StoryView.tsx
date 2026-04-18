@@ -13,20 +13,41 @@ import { SignInPrompt } from "./SignInPrompt";
 import { PlayButton } from "./PlayButton";
 
 export function StoryView({ storyId }: { storyId: string }) {
-  const { status, pages, current, error, choose, restart } = useStory(storyId);
+  const {
+    status,
+    pages,
+    current,
+    cursor,
+    atLatest,
+    canGoPrev,
+    canGoNext,
+    error,
+    choose,
+    goPrev,
+    goNext,
+    goLatest,
+    restart,
+  } = useStory(storyId);
   const [depthUrl, setDepthUrl] = useState<string | undefined>(current?.depthUrl);
 
   useEffect(() => {
     setDepthUrl(current?.depthUrl);
-    if (!current || current.depthUrl || !current.imageUrl) return;
+    if (!current || current.depthUrl || !current.imageUrl) {
+      if (current?.depthUrl) console.log(`[story] page seq=${current.index} already has depth`);
+      return;
+    }
+    console.log(`[story] requesting depth for seq=${current.index}`);
+    const t0 = performance.now();
     let cancelled = false;
     api
       .depth(storyId, current.index)
       .then((res) => {
-        if (!cancelled) setDepthUrl(res.depthUrl);
+        if (cancelled) return;
+        console.log(`[story] depth ready in ${Math.round(performance.now() - t0)}ms: ${res.depthUrl}`);
+        setDepthUrl(res.depthUrl);
       })
-      .catch(() => {
-        /* fallback to still image */
+      .catch((e) => {
+        console.warn(`[story] depth request failed after ${Math.round(performance.now() - t0)}ms`, e);
       });
     return () => {
       cancelled = true;
@@ -60,21 +81,58 @@ export function StoryView({ storyId }: { storyId: string }) {
         initialAudioUrl={current.audioUrl}
         narrativeChars={current.narrative.length}
       />
-      {status === "choosing" && <Skeleton variant="next" />}
-      {status === "needs_auth" && <SignInPrompt />}
-      {current.isEnding ? (
-        <EndingCard endingType={current.endingType} onRestart={restart} />
+      {atLatest ? (
+        <>
+          {status === "choosing" && <Skeleton variant="next" />}
+          {status === "needs_auth" && <SignInPrompt />}
+          {current.isEnding ? (
+            <EndingCard endingType={current.endingType} onRestart={restart} />
+          ) : (
+            <ChoiceButtons
+              choices={current.choices}
+              disabled={status === "choosing" || status === "needs_auth"}
+              onChoose={choose}
+            />
+          )}
+        </>
       ) : (
-        <ChoiceButtons
-          choices={current.choices}
-          disabled={status === "choosing" || status === "needs_auth"}
-          onChoose={choose}
-        />
+        <div className="rounded-md border border-stone-300 bg-stone-50 px-4 py-3 text-sm text-stone-600">
+          You're reading an earlier page.{" "}
+          <button
+            type="button"
+            onClick={goLatest}
+            className="underline underline-offset-2 hover:text-stone-900"
+          >
+            Jump to the current page &rarr;
+          </button>
+        </div>
       )}
       {error && <p className="text-sm" style={{ color: "var(--crimson)" }}>{error}</p>}
-      <footer className="pt-4 text-xs" style={{ color: "var(--stone-gray)" }}>
-        Page {current.index + 1} of {pages.length}
-        {current.imageProvider ? ` -- art via ${current.imageProvider}` : ""}
+      <footer className="flex items-center justify-between pt-4 text-xs" style={{ color: "var(--stone-gray)" }}>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={!canGoPrev}
+            className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
+            aria-label="Previous page"
+          >
+            &larr; Prev
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={!canGoNext}
+            className="rounded-full border border-stone-300 px-2 py-1 disabled:opacity-30 disabled:cursor-not-allowed enabled:hover:bg-white"
+            aria-label="Next page"
+          >
+            Next &rarr;
+          </button>
+        </div>
+        <div>
+          Page {cursor + 1} of {pages.length}
+          {current.imageProvider ? ` -- art via ${current.imageProvider}` : ""}
+        </div>
       </footer>
     </article>
   );

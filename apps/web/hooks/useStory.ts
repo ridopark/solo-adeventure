@@ -12,6 +12,7 @@ interface State {
   status: Status;
   pages: Page[];
   stylePrefix: string;
+  cursor: number;
   error?: string;
 }
 
@@ -22,36 +23,47 @@ type Action =
   | { type: "choose_ok"; page: Page }
   | { type: "choose_err"; error: string }
   | { type: "needs_auth" }
+  | { type: "goto"; cursor: number }
   | { type: "reset" };
 
-const initial: State = { status: "hydrating", pages: [], stylePrefix: "" };
+const initial: State = { status: "hydrating", pages: [], stylePrefix: "", cursor: 0 };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case "hydrate":
+    case "hydrate": {
+      const last = action.story.pages.length - 1;
       return {
         status: action.story.pages.at(-1)?.isEnding ? "ended" : "page_ready",
         pages: action.story.pages,
         stylePrefix: action.story.stylePrefix,
+        cursor: Math.max(0, last),
       };
+    }
     case "seed":
       return {
         status: action.start.page.isEnding ? "ended" : "page_ready",
         pages: [action.start.page],
         stylePrefix: action.start.stylePrefix,
+        cursor: 0,
       };
     case "choose_start":
       return { ...state, status: "choosing", error: undefined };
-    case "choose_ok":
+    case "choose_ok": {
+      const pages = [...state.pages, action.page];
       return {
         status: action.page.isEnding ? "ended" : "page_ready",
-        pages: [...state.pages, action.page],
+        pages,
         stylePrefix: state.stylePrefix,
+        cursor: pages.length - 1,
       };
+    }
     case "choose_err":
       return { ...state, status: "error", error: action.error };
     case "needs_auth":
       return { ...state, status: "needs_auth", error: undefined };
+    case "goto":
+      if (action.cursor < 0 || action.cursor >= state.pages.length) return state;
+      return { ...state, cursor: action.cursor, error: undefined };
     case "reset":
       return initial;
   }
@@ -126,17 +138,38 @@ export function useStory(storyId: string) {
     [storyId],
   );
 
+  const goPrev = useCallback(() => {
+    dispatch({ type: "goto", cursor: state.cursor - 1 });
+  }, [state.cursor]);
+
+  const goNext = useCallback(() => {
+    dispatch({ type: "goto", cursor: state.cursor + 1 });
+  }, [state.cursor]);
+
+  const goLatest = useCallback(() => {
+    dispatch({ type: "goto", cursor: state.pages.length - 1 });
+  }, [state.pages.length]);
+
   const restart = useCallback(() => {
     cache.clear();
     router.push("/");
   }, [cache, router]);
 
+  const atLatest = state.cursor === state.pages.length - 1;
+
   return {
     status: state.status,
     pages: state.pages,
-    current: state.pages.at(-1) ?? null,
+    current: state.pages[state.cursor] ?? null,
+    cursor: state.cursor,
+    atLatest,
+    canGoPrev: state.cursor > 0,
+    canGoNext: state.cursor < state.pages.length - 1,
     error: state.error,
     choose,
+    goPrev,
+    goNext,
+    goLatest,
     restart,
   };
 }

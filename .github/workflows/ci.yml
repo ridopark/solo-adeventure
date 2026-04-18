@@ -179,7 +179,6 @@ jobs:
             mv /opt/solo-adeventure/staging/services/tts/main.py /opt/solo-adeventure/tts/main.py
             mv /opt/solo-adeventure/staging/services/tts/requirements.txt /opt/solo-adeventure/tts/requirements.txt
             sudo mv /opt/solo-adeventure/staging/deployments/systemd/solo-adeventure-tts.service /etc/systemd/system/solo-adeventure-tts.service
-            rm -rf /opt/solo-adeventure/staging
 
             # Create or reuse venv, install/upgrade deps
             if [ ! -d /opt/solo-adeventure/tts/venv ]; then

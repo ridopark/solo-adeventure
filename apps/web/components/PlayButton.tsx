@@ -45,15 +45,21 @@ export function PlayButton({
 
   useEffect(() => {
     if (audioUrl) return;
+    console.log(`[tts] requesting narration for seq=${seq}`);
+    const t0 = performance.now();
     let cancelled = false;
     (async () => {
       try {
         const res = await api.speech(storyId, seq);
         if (cancelled) return;
+        console.log(`[tts] audio ready in ${Math.round(performance.now() - t0)}ms: ${res.audioUrl}`);
         setAudioUrl(res.audioUrl);
         setStatus("idle");
-      } catch {
-        if (!cancelled) setStatus("error");
+      } catch (e) {
+        if (!cancelled) {
+          console.warn(`[tts] speech failed after ${Math.round(performance.now() - t0)}ms`, e);
+          setStatus("error");
+        }
       }
     })();
     return () => {
