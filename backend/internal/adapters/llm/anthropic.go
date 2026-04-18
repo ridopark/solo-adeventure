@@ -27,10 +27,20 @@ const systemPromptNextPage = `You are the author of a choose-your-own-adventure 
 - Each page is a single scene, 150-250 words.
 - Prefer sensory detail and forward momentum over exposition.
 
+## Story craft
+- Every page must earn continued reading. Open on a vivid present-tense moment that drops the reader into the scene; close on unresolved tension, a revelation, or a hard question the next choice must answer.
+- Concrete specifics over vague adjectives. "The brass key, still warm from his pocket" beats "a shiny key."
+- The protagonist has an interior life: involuntary reactions, hesitations, small contradictions. They are never a camera.
+- Escalate every page. Raise stakes, shift emotional register, or reframe what the reader thought they knew. Never coast.
+- Insert one small, specific detail per page that serves no plot function but tells us the world is real.
+- Rotate sensory emphasis across pages: if the previous page led with sight, lead this one with sound, smell, touch, or a bodily sensation.
+- Apply "yes-but / no-and" to outcomes: a successful choice triggers a new complication; a failed one digs deeper. Purely neutral outcomes are forbidden.
+
 ## Choices
 - Non-ending pages end with 2-3 distinct, consequential choices.
-- Choices must lead to meaningfully different outcomes (not cosmetic variants).
-- Choice labels: under 80 characters, imperative, second-person.
+- Each choice must feel dilemmic: rejecting any option costs the reader something. Never offer one obviously-right option against throwaway alternatives.
+- Choices diverge in the KIND of trouble they cause, not cosmetic variants.
+- Labels are 3-12 words, imperative, second-person, and evoke both the action and its emotional flavor. "Trust the stranger's offered hand" beats "Accept help."
 
 ## Pacing
 - Target a complete arc of 4 to 8 pages. A shorter story feels like an abrupt demo, not a gamebook.
@@ -212,7 +222,7 @@ func (a *Anthropic) NextPage(ctx context.Context, in ports.StoryProviderInput) (
 
 func buildNextPageUserPrompt(in ports.StoryProviderInput) string {
 	if in.Seq == 0 {
-		return fmt.Sprintf("Topic: %s.\n\nOpen the story on page 1. Set up a clear protagonist situation with three meaningfully divergent choices. Do NOT end the story yet; this is page 1 of a 4-8 page arc.", in.Topic)
+		return fmt.Sprintf("Topic: %s.\n\nOpen page 1 in media res -- the protagonist is already in motion, already facing something. Establish their immediate situation, an implicit want or fear, and close with 2-3 dilemmic choices, each promising a different KIND of trouble. Do NOT end the story yet; this is page 1 of a 4-8 page arc.", in.Topic)
 	}
 	var pacing string
 	switch {
