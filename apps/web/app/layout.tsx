@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { VisitPing } from "@/components/VisitPing";
+import { InAppBrowserBanner } from "@/components/InAppBrowserBanner";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen antialiased" style={{ background: "var(--parchment)", color: "var(--near-black)" }}>
+        <InAppBrowserBanner />
         <VisitPing />
         {children}
       </body>
