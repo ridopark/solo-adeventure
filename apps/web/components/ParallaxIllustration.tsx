@@ -191,6 +191,17 @@ export function ParallaxIllustration({
     try {
       const width = mount.clientWidth || 512;
       const height = mount.clientHeight || 512;
+      // On mobile the illustration fills the viewport and users expect to see
+      // the whole image. Desktop has it floated alongside text, where a bit of
+      // edge crop reads as cinematic framing. Tune plane size + camera pan
+      // accordingly: desktop shows ~68% with a generous sweep; mobile shows
+      // ~89% with a small sweep.
+      const isDesktop =
+        typeof window !== "undefined" &&
+        window.matchMedia("(min-width: 1024px)").matches;
+      const planeSize = isDesktop ? 3 : 2.3;
+      const panX = isDesktop ? 0.35 : 0.1;
+      const panY = isDesktop ? 0.2 : 0.06;
 
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 10);
@@ -243,11 +254,7 @@ export function ParallaxIllustration({
             `[parallax] depth stats ${depthAnalysis.width}x${depthAnalysis.height} range=${depthAnalysis.range} avgGrad=${depthAnalysis.avgGradient.toFixed(3)} edgeRatio=${depthAnalysis.edgeRatio.toFixed(3)} -> displacement=${dispScale.toFixed(2)}`,
           );
 
-          // Plane slightly oversized (2.3 vs ~2.05-unit viewport at z=2.2) so
-          // the container's stone-200 background never peeks through at max
-          // camera pan, without cropping too much of the image. overflow-hidden
-          // on the parent clips anything beyond the frame.
-          const geometry = new THREE.PlaneGeometry(2.3, 2.3, 200, 200);
+          const geometry = new THREE.PlaneGeometry(planeSize, planeSize, 200, 200);
           const tw = depthAnalysis.width;
           const th = depthAnalysis.height;
           const material = new THREE.ShaderMaterial({
@@ -267,7 +274,7 @@ export function ParallaxIllustration({
           const start = performance.now();
           let frames = 0;
           let lastSample = start;
-          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 plane=2.3 edgeFade=on texel=${(1 / tw).toFixed(5)}`);
+          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 plane=${planeSize} pan=${panX}/${panY} edgeFade=on texel=${(1 / tw).toFixed(5)}`);
           const render = () => {
             if (disposed) return;
             const now = performance.now();
@@ -277,8 +284,8 @@ export function ParallaxIllustration({
               camera.lookAt(0, 0, 0);
             } else {
               const t = (now - start) * 0.0006;
-              camera.position.x = Math.sin(t + phase) * 0.1;
-              camera.position.y = Math.cos(t * 1.2 + phase) * 0.06;
+              camera.position.x = Math.sin(t + phase) * panX;
+              camera.position.y = Math.cos(t * 1.2 + phase) * panY;
               camera.lookAt(0, 0, 0);
             }
             renderer!.render(scene, camera);
