@@ -16,51 +16,110 @@ function proxyImage(url: string) {
   return `${BACKEND_URL}/img?url=${encodeURIComponent(url)}`;
 }
 
-async function inspectDepth(url: string): Promise<void> {
-  try {
-    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const el = new Image();
-      el.crossOrigin = "anonymous";
-      el.onload = () => resolve(el);
-      el.onerror = reject;
-      el.src = url;
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(img, 0, 0);
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let min = 255;
-    let max = 0;
-    let sum = 0;
-    let n = 0;
-    const stride = 64;
-    for (let i = 0; i < data.length; i += 4 * stride) {
+interface DepthAnalysis {
+  texture: THREE.Texture;
+  width: number;
+  height: number;
+  range: number; // 0-255 depth span
+  avgGradient: number; // 0-1 average edge magnitude
+  edgeRatio: number; // 0-1 fraction of pixels at sharp cliffs
+}
+
+// Auto-tune displacement scale per image. Dense sharp edges tear vertices,
+// so we pull back hard when the depth map is busy; smooth maps get more pop.
+function autoDisplacement(a: DepthAnalysis): number {
+  if (a.range < 30) return 0.15;
+  const base = 0.75 - a.edgeRatio * 3.2;
+  return Math.max(0.2, Math.min(0.75, base));
+}
+
+// Load the depth image once, analyze pixels, and reuse the element for the
+// three.js texture so we don't fetch it twice.
+async function analyzeDepth(url: string): Promise<DepthAnalysis> {
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.crossOrigin = "anonymous";
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = url;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no 2d context");
+  ctx.drawImage(img, 0, 0);
+  const { width: W, height: H } = canvas;
+  const data = ctx.getImageData(0, 0, W, H).data;
+
+  let min = 255;
+  let max = 0;
+  let totalGradient = 0;
+  let sharpEdges = 0;
+  let samples = 0;
+  const step = 4;
+  const rowStride = W * 4;
+  for (let y = step; y < H - step; y += step) {
+    for (let x = step; x < W - step; x += step) {
+      const i = y * rowStride + x * 4;
       const v = data[i];
       if (v < min) min = v;
       if (v > max) max = v;
-      sum += v;
-      n++;
+      const l = data[i - step * 4];
+      const r = data[i + step * 4];
+      const u = data[i - step * rowStride];
+      const d = data[i + step * rowStride];
+      const g = Math.max(Math.abs(r - l), Math.abs(d - u));
+      totalGradient += g;
+      if (g > 48) sharpEdges++;
+      samples++;
     }
-    const avg = Math.round(sum / n);
-    console.log(
-      `[parallax] depth stats ${canvas.width}x${canvas.height} min=${min} max=${max} avg=${avg} range=${max - min} (${max - min > 30 ? "OK" : "FLAT -- depth map has low variance"})`,
-    );
-  } catch (e) {
-    console.warn("[parallax] depth inspect failed", e);
   }
+  const avgGradient = totalGradient / samples / 255;
+  const edgeRatio = sharpEdges / samples;
+
+  const texture = new THREE.Texture(img);
+  texture.needsUpdate = true;
+  return {
+    texture,
+    width: W,
+    height: H,
+    range: max - min,
+    avgGradient,
+    edgeRatio,
+  };
 }
 
 const VERTEX_SHADER = /* glsl */ `
   uniform sampler2D depthMap;
   uniform float displacementScale;
+  uniform vec2 texelSize;
   varying vec2 vUv;
+  varying float vDepthGradient;
+
+  // 3x3 box blur of the depth sample smooths sharp depth cliffs so
+  // vertices don't tear across foreground/background transitions.
+  float sampleDepth(vec2 uv) {
+    float sum = 0.0;
+    for (int i = -1; i <= 1; i++) {
+      for (int j = -1; j <= 1; j++) {
+        sum += texture2D(depthMap, uv + vec2(float(i), float(j)) * texelSize).r;
+      }
+    }
+    return sum / 9.0;
+  }
+
   void main() {
     vUv = uv;
-    float d = texture2D(depthMap, uv).r;
-    vec3 displaced = position + vec3(0.0, 0.0, d * displacementScale);
+    float d = sampleDepth(uv);
+    // soften extreme displacement with a gentle curve
+    float softened = pow(d, 0.85);
+    // measure local gradient so the fragment shader can fade stretched geometry
+    float dx = abs(sampleDepth(uv + vec2(texelSize.x, 0.0)) - sampleDepth(uv - vec2(texelSize.x, 0.0)));
+    float dy = abs(sampleDepth(uv + vec2(0.0, texelSize.y)) - sampleDepth(uv - vec2(0.0, texelSize.y)));
+    vDepthGradient = max(dx, dy);
+
+    vec3 displaced = position + vec3(0.0, 0.0, softened * displacementScale);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
   }
 `;
@@ -68,8 +127,13 @@ const VERTEX_SHADER = /* glsl */ `
 const FRAGMENT_SHADER = /* glsl */ `
   uniform sampler2D colorMap;
   varying vec2 vUv;
+  varying float vDepthGradient;
   void main() {
-    gl_FragColor = texture2D(colorMap, vUv);
+    vec4 c = texture2D(colorMap, vUv);
+    // fade stretched triangles where depth changes fast (edges between
+    // foreground and background) to hide the rubber-sheeting artifact
+    float edgeFade = 1.0 - smoothstep(0.04, 0.12, vDepthGradient);
+    gl_FragColor = vec4(c.rgb, c.a * edgeFade);
   }
 `;
 
@@ -92,7 +156,6 @@ export function ParallaxIllustration({
     if (!mount) return;
 
     console.log(`[parallax] init seq=${seq} image=${imageSrc} depth=${depthSrc}`);
-    void inspectDepth(resolveURL(depthSrc));
 
     let renderer: THREE.WebGLRenderer | null = null;
     let animationId = 0;
@@ -137,9 +200,10 @@ export function ParallaxIllustration({
 
       Promise.all([
         loadTexture(proxyImage(imageSrc), "color"),
-        loadTexture(resolveURL(depthSrc), "depth"),
+        analyzeDepth(resolveURL(depthSrc)),
       ])
-        .then(([colorTex, depthTex]) => {
+        .then(([colorTex, depthAnalysis]) => {
+          const depthTex = depthAnalysis.texture;
           if (disposed) {
             colorTex.dispose();
             depthTex.dispose();
@@ -148,16 +212,24 @@ export function ParallaxIllustration({
           colorTex.colorSpace = THREE.SRGBColorSpace;
           depthTex.minFilter = THREE.LinearFilter;
           depthTex.magFilter = THREE.LinearFilter;
+          const dispScale = autoDisplacement(depthAnalysis);
+          console.log(
+            `[parallax] depth stats ${depthAnalysis.width}x${depthAnalysis.height} range=${depthAnalysis.range} avgGrad=${depthAnalysis.avgGradient.toFixed(3)} edgeRatio=${depthAnalysis.edgeRatio.toFixed(3)} -> displacement=${dispScale.toFixed(2)}`,
+          );
 
-          const geometry = new THREE.PlaneGeometry(2, 2, 128, 128);
+          const geometry = new THREE.PlaneGeometry(2, 2, 200, 200);
+          const tw = depthAnalysis.width;
+          const th = depthAnalysis.height;
           const material = new THREE.ShaderMaterial({
             vertexShader: VERTEX_SHADER,
             fragmentShader: FRAGMENT_SHADER,
             uniforms: {
               colorMap: { value: colorTex },
               depthMap: { value: depthTex },
-              displacementScale: { value: 0.9 },
+              displacementScale: { value: dispScale },
+              texelSize: { value: new THREE.Vector2(1 / tw, 1 / th) },
             },
+            transparent: true,
           });
           const mesh = new THREE.Mesh(geometry, material);
           scene.add(mesh);
@@ -166,7 +238,7 @@ export function ParallaxIllustration({
           const start = performance.now();
           let frames = 0;
           let lastSample = start;
-          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=0.9`);
+          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 edgeFade=on texel=${(1 / tw).toFixed(5)}`);
           const render = () => {
             if (disposed) return;
             const now = performance.now();
