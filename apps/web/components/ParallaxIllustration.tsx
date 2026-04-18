@@ -27,10 +27,12 @@ interface DepthAnalysis {
 
 // Auto-tune displacement scale per image. Dense sharp edges tear vertices,
 // so we pull back hard when the depth map is busy; smooth maps get more pop.
+// Max ceiling kept conservative (0.5) because even the local blur mask can't
+// fully hide tears at extreme displacement.
 function autoDisplacement(a: DepthAnalysis): number {
-  if (a.range < 30) return 0.15;
-  const base = 0.75 - a.edgeRatio * 3.2;
-  return Math.max(0.2, Math.min(0.75, base));
+  if (a.range < 30) return 0.12;
+  const base = 0.5 - a.edgeRatio * 2.4;
+  return Math.max(0.18, Math.min(0.5, base));
 }
 
 // Load the depth image once, analyze pixels, and reuse the element for the
@@ -95,30 +97,25 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float displacementScale;
   uniform vec2 texelSize;
   varying vec2 vUv;
-  varying float vDepthGradient;
 
-  // 3x3 box blur of the depth sample smooths sharp depth cliffs so
-  // vertices don't tear across foreground/background transitions.
+  // 5x5 box blur of depth so vertex Z eases across foreground/background
+  // transitions instead of snapping.
   float sampleDepth(vec2 uv) {
     float sum = 0.0;
-    for (int i = -1; i <= 1; i++) {
-      for (int j = -1; j <= 1; j++) {
+    for (int i = -2; i <= 2; i++) {
+      for (int j = -2; j <= 2; j++) {
         sum += texture2D(depthMap, uv + vec2(float(i), float(j)) * texelSize).r;
       }
     }
-    return sum / 9.0;
+    return sum / 25.0;
   }
 
   void main() {
     vUv = uv;
     float d = sampleDepth(uv);
-    // soften extreme displacement with a gentle curve
-    float softened = pow(d, 0.85);
-    // measure local gradient so the fragment shader can fade stretched geometry
-    float dx = abs(sampleDepth(uv + vec2(texelSize.x, 0.0)) - sampleDepth(uv - vec2(texelSize.x, 0.0)));
-    float dy = abs(sampleDepth(uv + vec2(0.0, texelSize.y)) - sampleDepth(uv - vec2(0.0, texelSize.y)));
-    vDepthGradient = max(dx, dy);
-
+    // sigmoid-ish soften: extreme near values (thin protrusions) are pulled
+    // back hardest so a single bright depth pixel can't launch a vertex.
+    float softened = pow(d, 0.9);
     vec3 displaced = position + vec3(0.0, 0.0, softened * displacementScale);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
   }
@@ -126,14 +123,39 @@ const VERTEX_SHADER = /* glsl */ `
 
 const FRAGMENT_SHADER = /* glsl */ `
   uniform sampler2D colorMap;
+  uniform sampler2D depthMap;
+  uniform vec2 texelSize;
   varying vec2 vUv;
-  varying float vDepthGradient;
+
+  // Per-fragment depth gradient instead of vertex-interpolated. Catches
+  // every edge pixel, not just ones that happen to be near a vertex.
+  float fragGradient(vec2 uv) {
+    float dl = texture2D(depthMap, uv - vec2(texelSize.x, 0.0)).r;
+    float dr = texture2D(depthMap, uv + vec2(texelSize.x, 0.0)).r;
+    float du = texture2D(depthMap, uv - vec2(0.0, texelSize.y)).r;
+    float dd = texture2D(depthMap, uv + vec2(0.0, texelSize.y)).r;
+    return max(abs(dr - dl), abs(dd - du));
+  }
+
+  // Local 3x3 color blur used to mask stretch artifacts at high-gradient
+  // edges. Rubber-sheeted triangles look terrible; gently blurred ones
+  // read as soft depth-of-field.
+  vec4 blurredColor(vec2 uv) {
+    vec4 sum = vec4(0.0);
+    for (int i = -1; i <= 1; i++) {
+      for (int j = -1; j <= 1; j++) {
+        sum += texture2D(colorMap, uv + vec2(float(i), float(j)) * texelSize * 2.0);
+      }
+    }
+    return sum / 9.0;
+  }
+
   void main() {
-    vec4 c = texture2D(colorMap, vUv);
-    // fade stretched triangles where depth changes fast (edges between
-    // foreground and background) to hide the rubber-sheeting artifact
-    float edgeFade = 1.0 - smoothstep(0.04, 0.12, vDepthGradient);
-    gl_FragColor = vec4(c.rgb, c.a * edgeFade);
+    float g = fragGradient(vUv);
+    float mask = smoothstep(0.025, 0.10, g);
+    vec4 sharp = texture2D(colorMap, vUv);
+    vec4 soft = mask > 0.01 ? blurredColor(vUv) : sharp;
+    gl_FragColor = mix(sharp, soft, mask);
   }
 `;
 
@@ -217,7 +239,11 @@ export function ParallaxIllustration({
             `[parallax] depth stats ${depthAnalysis.width}x${depthAnalysis.height} range=${depthAnalysis.range} avgGrad=${depthAnalysis.avgGradient.toFixed(3)} edgeRatio=${depthAnalysis.edgeRatio.toFixed(3)} -> displacement=${dispScale.toFixed(2)}`,
           );
 
-          const geometry = new THREE.PlaneGeometry(2, 2, 200, 200);
+          // Plane is deliberately oversized (3x3 vs ~2 unit viewport at z=2.2)
+          // so the container's stone-200 background never peeks through when
+          // the camera pans to extremes. overflow-hidden on the parent clips
+          // anything beyond the frame.
+          const geometry = new THREE.PlaneGeometry(3, 3, 200, 200);
           const tw = depthAnalysis.width;
           const th = depthAnalysis.height;
           const material = new THREE.ShaderMaterial({
@@ -229,7 +255,6 @@ export function ParallaxIllustration({
               displacementScale: { value: dispScale },
               texelSize: { value: new THREE.Vector2(1 / tw, 1 / th) },
             },
-            transparent: true,
           });
           const mesh = new THREE.Mesh(geometry, material);
           scene.add(mesh);
@@ -238,13 +263,13 @@ export function ParallaxIllustration({
           const start = performance.now();
           let frames = 0;
           let lastSample = start;
-          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 edgeFade=on texel=${(1 / tw).toFixed(5)}`);
+          console.log(`[parallax] render loop starting, phase=${phase.toFixed(2)} displacement=${dispScale.toFixed(2)} subdiv=200 plane=3 edgeFade=on texel=${(1 / tw).toFixed(5)}`);
           const render = () => {
             if (disposed) return;
             const now = performance.now();
             const t = (now - start) * 0.0006;
-            camera.position.x = Math.sin(t + phase) * 0.45;
-            camera.position.y = Math.cos(t * 1.2 + phase) * 0.25;
+            camera.position.x = Math.sin(t + phase) * 0.35;
+            camera.position.y = Math.cos(t * 1.2 + phase) * 0.2;
             camera.lookAt(0, 0, 0);
             renderer!.render(scene, camera);
             frames++;
