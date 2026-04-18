@@ -18,12 +18,13 @@ export function StoryView({ storyId }: { storyId: string }) {
 
   return (
     <article className="space-y-6">
-      <Illustration src={current.imageUrl} alt={`Page ${current.index + 1}`} />
+      <Illustration src={current.imageUrl} alt={`Page ${current.index + 1}`} seq={current.index} />
       <NarrativeBlock text={current.narrative} />
       <PlayButton
         storyId={storyId}
         seq={current.index}
         initialAudioUrl={current.audioUrl}
+        narrativeChars={current.narrative.length}
       />
       {status === "choosing" && <Skeleton variant="next" />}
       {status === "needs_auth" && <SignInPrompt />}
